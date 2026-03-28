@@ -2,7 +2,7 @@ import type * as SQLite from 'expo-sqlite';
 
 import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { createId, nowIso } from '@/data/db-utils';
-import type { FuelEntryRecord } from '@/data/types';
+import type { FuelEntryRecord, ReceiptAttachment } from '@/data/types';
 
 import { normalizeOptionalText, normalizeRequiredText } from './shared';
 
@@ -11,6 +11,7 @@ const PRICE_MAX = 500000;
 const STATION_MIN = 2;
 const STATION_MAX = 80;
 const NOTES_MAX = 500;
+const ODOMETER_MAX = 9_999_999;
 
 type FuelRow = {
   id: string;
@@ -19,9 +20,25 @@ type FuelRow = {
   liters: number;
   total_price: number;
   station: string;
+  odometer_km: number | null;
+  avg_consumption_l_per_100km: number | null;
+  receipt_uri: string | null;
+  receipt_name: string | null;
+  receipt_mime_type: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type FuelCreateInput = {
+  vehicleId: string;
+  occurredAt?: string | null;
+  liters: number;
+  totalPrice: number;
+  station: string;
+  odometerKm: number;
+  receipt?: ReceiptAttachment | null;
+  notes?: string | null;
 };
 
 function mapFuelRecord(row: FuelRow): FuelEntryRecord {
@@ -32,6 +49,11 @@ function mapFuelRecord(row: FuelRow): FuelEntryRecord {
     liters: row.liters,
     totalPrice: row.total_price,
     station: row.station,
+    odometerKm: row.odometer_km,
+    avgConsumptionLPer100Km: row.avg_consumption_l_per_100km,
+    receiptUri: row.receipt_uri,
+    receiptName: row.receipt_name,
+    receiptMimeType: row.receipt_mime_type,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -65,6 +87,20 @@ function normalizePositiveNumber(value: number, fieldName: string, max: number) 
   return value;
 }
 
+function normalizeOdometer(value: number) {
+  if (!Number.isInteger(value)) {
+    throw new Error('Current km must be a whole number.');
+  }
+  if (value < 0) {
+    throw new Error('Current km must be 0 or greater.');
+  }
+  if (value > ODOMETER_MAX) {
+    throw new Error(`Current km must be less than or equal to ${ODOMETER_MAX}.`);
+  }
+
+  return value;
+}
+
 function normalizeStation(value: string) {
   const station = normalizeRequiredText(value, 'Station/vendor');
   if (station.length < STATION_MIN) {
@@ -84,6 +120,22 @@ function normalizeFuelNotes(value: string | null | undefined) {
   }
 
   return notes;
+}
+
+function normalizeReceipt(value: ReceiptAttachment | null | undefined): ReceiptAttachment | null {
+  if (!value) {
+    return null;
+  }
+
+  const uri = normalizeRequiredText(value.uri, 'Receipt URI');
+  const name = normalizeRequiredText(value.name, 'Receipt name');
+  const mimeType = normalizeOptionalText(value.mimeType);
+
+  return {
+    uri,
+    name,
+    mimeType,
+  };
 }
 
 async function ensureVehicleExists(db: SQLite.SQLiteDatabase, vehicleId: string) {
@@ -113,6 +165,11 @@ async function getFuelRowById(db: SQLite.SQLiteDatabase, id: string) {
         liters,
         total_price,
         station,
+        odometer_km,
+        avg_consumption_l_per_100km,
+        receipt_uri,
+        receipt_name,
+        receipt_mime_type,
         notes,
         created_at,
         updated_at
@@ -123,6 +180,88 @@ async function getFuelRowById(db: SQLite.SQLiteDatabase, id: string) {
     `,
     [id],
   );
+}
+
+async function getLatestVehicleOdometer(
+  db: SQLite.SQLiteDatabase,
+  vehicleId: string,
+  options: { excludeFuelId?: string } = {},
+) {
+  const row = await db.getFirstAsync<{ odometer_km: number | null }>(
+    `
+      SELECT odometer_km
+      FROM (
+        SELECT t.end_odometer_km AS odometer_km, t.occurred_at AS occurred_at
+        FROM trips t
+        WHERE t.vehicle_id = ?
+          AND t.deleted_at IS NULL
+          AND t.end_odometer_km IS NOT NULL
+
+        UNION ALL
+
+        SELECT f.odometer_km AS odometer_km, f.occurred_at AS occurred_at
+        FROM fuel_entries f
+        WHERE f.vehicle_id = ?
+          AND f.deleted_at IS NULL
+          AND (? = '' OR f.id <> ?)
+          AND f.odometer_km IS NOT NULL
+      ) latest
+      ORDER BY latest.occurred_at DESC
+      LIMIT 1
+    `,
+    [vehicleId, vehicleId, options.excludeFuelId ?? '', options.excludeFuelId ?? ''],
+  );
+
+  return row?.odometer_km ?? null;
+}
+
+async function getLatestFuelOdometer(
+  db: SQLite.SQLiteDatabase,
+  vehicleId: string,
+  options: { excludeFuelId?: string } = {},
+) {
+  const row = await db.getFirstAsync<{ odometer_km: number | null }>(
+    `
+      SELECT odometer_km
+      FROM fuel_entries
+      WHERE vehicle_id = ?
+        AND deleted_at IS NULL
+        AND (? = '' OR id <> ?)
+        AND odometer_km IS NOT NULL
+      ORDER BY occurred_at DESC, created_at DESC
+      LIMIT 1
+    `,
+    [vehicleId, options.excludeFuelId ?? '', options.excludeFuelId ?? ''],
+  );
+
+  return row?.odometer_km ?? null;
+}
+
+function calculateAvgConsumption(liters: number, odometerKm: number, previousFuelOdometerKm: number | null) {
+  if (previousFuelOdometerKm === null) {
+    return null;
+  }
+
+  const distanceKm = odometerKm - previousFuelOdometerKm;
+  if (distanceKm <= 0) {
+    return null;
+  }
+
+  const raw = (liters / distanceKm) * 100;
+  return Math.round(raw * 100) / 100;
+}
+
+function normalizeCreateInput(input: FuelCreateInput) {
+  return {
+    vehicleId: input.vehicleId,
+    occurredAt: normalizeOccurredAt(input.occurredAt),
+    liters: normalizePositiveNumber(input.liters, 'Liters', LITERS_MAX),
+    totalPrice: normalizePositiveNumber(input.totalPrice, 'Total price', PRICE_MAX),
+    station: normalizeStation(input.station),
+    odometerKm: normalizeOdometer(input.odometerKm),
+    receipt: normalizeReceipt(input.receipt),
+    notes: normalizeFuelNotes(input.notes),
+  };
 }
 
 export const fuelRepo = {
@@ -137,6 +276,11 @@ export const fuelRepo = {
           liters,
           total_price,
           station,
+          odometer_km,
+          avg_consumption_l_per_100km,
+          receipt_uri,
+          receipt_name,
+          receipt_mime_type,
           notes,
           created_at,
           updated_at
@@ -157,25 +301,26 @@ export const fuelRepo = {
     return row ? mapFuelRecord(row) : null;
   },
 
-  async create(input: {
-    vehicleId: string;
-    occurredAt?: string | null;
-    liters: number;
-    totalPrice: number;
-    station: string;
-    notes?: string | null;
-  }): Promise<FuelEntryRecord> {
+  async getLatestFuelOdometerKmForVehicle(vehicleId: string): Promise<number | null> {
+    const db = await getDatabase();
+    return getLatestFuelOdometer(db, vehicleId);
+  },
+
+  async create(input: FuelCreateInput): Promise<FuelEntryRecord> {
     const id = createId('fuel');
-    const vehicleId = input.vehicleId;
-    const occurredAt = normalizeOccurredAt(input.occurredAt);
-    const liters = normalizePositiveNumber(input.liters, 'Liters', LITERS_MAX);
-    const totalPrice = normalizePositiveNumber(input.totalPrice, 'Total price', PRICE_MAX);
-    const station = normalizeStation(input.station);
-    const notes = normalizeFuelNotes(input.notes);
+    const normalized = normalizeCreateInput(input);
     const timestamp = nowIso();
 
     return runInWriteTransaction(async (txn) => {
-      await ensureVehicleExists(txn, vehicleId);
+      await ensureVehicleExists(txn, normalized.vehicleId);
+
+      const latestOdometer = await getLatestVehicleOdometer(txn, normalized.vehicleId);
+      if (latestOdometer !== null && normalized.odometerKm < latestOdometer) {
+        throw new Error('Current km cannot be less than the latest recorded km.');
+      }
+
+      const previousFuelOdometer = await getLatestFuelOdometer(txn, normalized.vehicleId);
+      const avgConsumption = calculateAvgConsumption(normalized.liters, normalized.odometerKm, previousFuelOdometer);
 
       await txn.runAsync(
         `
@@ -186,24 +331,49 @@ export const fuelRepo = {
             liters,
             total_price,
             station,
+            odometer_km,
+            avg_consumption_l_per_100km,
+            receipt_uri,
+            receipt_name,
+            receipt_mime_type,
             notes,
             created_at,
             updated_at,
             deleted_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         `,
-        [id, vehicleId, occurredAt, liters, totalPrice, station, notes, timestamp, timestamp],
+        [
+          id,
+          normalized.vehicleId,
+          normalized.occurredAt,
+          normalized.liters,
+          normalized.totalPrice,
+          normalized.station,
+          normalized.odometerKm,
+          avgConsumption,
+          normalized.receipt?.uri ?? null,
+          normalized.receipt?.name ?? null,
+          normalized.receipt?.mimeType ?? null,
+          normalized.notes,
+          timestamp,
+          timestamp,
+        ],
       );
 
       return {
         id,
-        vehicleId,
-        occurredAt,
-        liters,
-        totalPrice,
-        station,
-        notes,
+        vehicleId: normalized.vehicleId,
+        occurredAt: normalized.occurredAt,
+        liters: normalized.liters,
+        totalPrice: normalized.totalPrice,
+        station: normalized.station,
+        odometerKm: normalized.odometerKm,
+        avgConsumptionLPer100Km: avgConsumption,
+        receiptUri: normalized.receipt?.uri ?? null,
+        receiptName: normalized.receipt?.name ?? null,
+        receiptMimeType: normalized.receipt?.mimeType ?? null,
+        notes: normalized.notes,
         createdAt: timestamp,
         updatedAt: timestamp,
       };
@@ -212,14 +382,7 @@ export const fuelRepo = {
 
   async update(
     id: string,
-    patch: {
-      vehicleId?: string;
-      occurredAt?: string | null;
-      liters?: number;
-      totalPrice?: number;
-      station?: string;
-      notes?: string | null;
-    },
+    patch: Partial<FuelCreateInput>,
   ): Promise<FuelEntryRecord> {
     return runInWriteTransaction(async (txn) => {
       const current = await getFuelRowById(txn, id);
@@ -227,19 +390,35 @@ export const fuelRepo = {
         throw new Error('Fuel entry not found.');
       }
 
-      const vehicleId = patch.vehicleId ?? current.vehicle_id;
-      const occurredAt = patch.occurredAt === undefined ? current.occurred_at : normalizeOccurredAt(patch.occurredAt);
-      const liters =
-        patch.liters === undefined ? current.liters : normalizePositiveNumber(patch.liters, 'Liters', LITERS_MAX);
-      const totalPrice =
-        patch.totalPrice === undefined
-          ? current.total_price
-          : normalizePositiveNumber(patch.totalPrice, 'Total price', PRICE_MAX);
-      const station = patch.station === undefined ? current.station : normalizeStation(patch.station);
-      const notes = patch.notes === undefined ? current.notes : normalizeFuelNotes(patch.notes);
-      const timestamp = nowIso();
+      const normalized = normalizeCreateInput({
+        vehicleId: patch.vehicleId ?? current.vehicle_id,
+        occurredAt: patch.occurredAt ?? current.occurred_at,
+        liters: patch.liters ?? current.liters,
+        totalPrice: patch.totalPrice ?? current.total_price,
+        station: patch.station ?? current.station,
+        odometerKm: patch.odometerKm ?? current.odometer_km ?? 0,
+        receipt:
+          patch.receipt ??
+          (current.receipt_uri
+            ? {
+                uri: current.receipt_uri,
+                name: current.receipt_name ?? 'receipt',
+                mimeType: current.receipt_mime_type,
+              }
+            : null),
+        notes: patch.notes ?? current.notes,
+      });
 
-      await ensureVehicleExists(txn, vehicleId);
+      await ensureVehicleExists(txn, normalized.vehicleId);
+
+      const latestOdometer = await getLatestVehicleOdometer(txn, normalized.vehicleId, { excludeFuelId: id });
+      if (latestOdometer !== null && normalized.odometerKm < latestOdometer) {
+        throw new Error('Current km cannot be less than the latest recorded km.');
+      }
+
+      const previousFuelOdometer = await getLatestFuelOdometer(txn, normalized.vehicleId, { excludeFuelId: id });
+      const avgConsumption = calculateAvgConsumption(normalized.liters, normalized.odometerKm, previousFuelOdometer);
+      const timestamp = nowIso();
 
       await txn.runAsync(
         `
@@ -249,22 +428,46 @@ export const fuelRepo = {
               liters = ?,
               total_price = ?,
               station = ?,
+              odometer_km = ?,
+              avg_consumption_l_per_100km = ?,
+              receipt_uri = ?,
+              receipt_name = ?,
+              receipt_mime_type = ?,
               notes = ?,
               updated_at = ?
           WHERE id = ?
             AND deleted_at IS NULL
         `,
-        [vehicleId, occurredAt, liters, totalPrice, station, notes, timestamp, id],
+        [
+          normalized.vehicleId,
+          normalized.occurredAt,
+          normalized.liters,
+          normalized.totalPrice,
+          normalized.station,
+          normalized.odometerKm,
+          avgConsumption,
+          normalized.receipt?.uri ?? null,
+          normalized.receipt?.name ?? null,
+          normalized.receipt?.mimeType ?? null,
+          normalized.notes,
+          timestamp,
+          id,
+        ],
       );
 
       return {
         id,
-        vehicleId,
-        occurredAt,
-        liters,
-        totalPrice,
-        station,
-        notes,
+        vehicleId: normalized.vehicleId,
+        occurredAt: normalized.occurredAt,
+        liters: normalized.liters,
+        totalPrice: normalized.totalPrice,
+        station: normalized.station,
+        odometerKm: normalized.odometerKm,
+        avgConsumptionLPer100Km: avgConsumption,
+        receiptUri: normalized.receipt?.uri ?? null,
+        receiptName: normalized.receipt?.name ?? null,
+        receiptMimeType: normalized.receipt?.mimeType ?? null,
+        notes: normalized.notes,
         createdAt: current.created_at,
         updatedAt: timestamp,
       };

@@ -87,7 +87,7 @@ export default function VehiclesScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search by name or plate"
+            placeholder="Search by name, plate, make, model, or VIN"
             placeholderTextColor={theme.textSecondary}
             autoCapitalize="none"
             autoCorrect={false}
@@ -158,6 +158,11 @@ export default function VehiclesScreen() {
               <ThemedView type="backgroundElement" style={styles.row}>
                 <View style={styles.rowLeft}>
                   <ThemedText type="smallBold">{vehicle.name}</ThemedText>
+                  {vehicle.make || vehicle.model ? (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {[vehicle.make, vehicle.model].filter(Boolean).join(' ')}
+                    </ThemedText>
+                  ) : null}
                   <ThemedText type="small" themeColor="textSecondary">
                     {vehicle.plate}
                   </ThemedText>

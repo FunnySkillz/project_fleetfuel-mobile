@@ -114,8 +114,17 @@ export const logsRepo = {
             t.vehicle_id AS vehicle_id,
             v.name AS vehicle_name,
             t.occurred_at AS occurred_at,
-            t.purpose || ', ' || t.distance_km || ' km' AS summary,
-            lower(v.name || ' ' || t.purpose || ' ' || ifnull(t.notes, '') || ' ' || t.occurred_at) AS search_text,
+            t.purpose || ' (' || t.distance_km || ' km)' AS summary,
+            lower(
+              v.name || ' ' ||
+              t.purpose || ' ' ||
+              ifnull(t.start_location, '') || ' ' ||
+              ifnull(t.end_location, '') || ' ' ||
+              ifnull(t.start_time, '') || ' ' ||
+              ifnull(t.end_time, '') || ' ' ||
+              ifnull(t.notes, '') || ' ' ||
+              t.occurred_at
+            ) AS search_text,
             t.private_tag AS private_tag
           FROM trips t
           INNER JOIN vehicles v ON v.id = t.vehicle_id
@@ -131,7 +140,13 @@ export const logsRepo = {
             v.name AS vehicle_name,
             f.occurred_at AS occurred_at,
             printf('%.2f L, EUR %.2f', f.liters, f.total_price) AS summary,
-            lower(v.name || ' ' || f.station || ' ' || ifnull(f.notes, '') || ' ' || f.occurred_at) AS search_text,
+            lower(
+              v.name || ' ' ||
+              f.station || ' ' ||
+              ifnull(f.receipt_name, '') || ' ' ||
+              ifnull(f.notes, '') || ' ' ||
+              f.occurred_at
+            ) AS search_text,
             NULL AS private_tag
           FROM fuel_entries f
           INNER JOIN vehicles v ON v.id = f.vehicle_id

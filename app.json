@@ -35,7 +35,14 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FleetFuel needs photo library access so you can attach receipt photos.",
+          "cameraPermission": "FleetFuel needs camera access so you can capture receipt photos."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -19,7 +19,7 @@ export function normalizeSearch(value: string | null | undefined) {
   return (value ?? '').trim().toLowerCase();
 }
 
-export function assertValidPrivateTag(value: string | null | undefined) {
+export function assertValidPrivateTag(value: string | null | undefined): 'private' | 'business' | null {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -43,6 +43,19 @@ export function ensureValidDayDate(value: string | null | undefined, fieldName: 
   return value;
 }
 
+export function ensureValidTime(value: string | null | undefined, fieldName: string) {
+  const normalized = normalizeOptionalText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(normalized)) {
+    throw new Error(`${fieldName} must use HH:MM (24h) format.`);
+  }
+
+  return normalized;
+}
+
 export function buildDayRangeIso(value: string | null | undefined, edge: 'start' | 'end') {
   const day = ensureValidDayDate(value, edge === 'start' ? 'From date' : 'To date');
   if (!day) {
@@ -59,4 +72,20 @@ export function formatIsoDate(iso: string) {
   }
 
   return parsed.toISOString().slice(0, 10);
+}
+
+export function normalizeOptionalInteger(value: number | null | undefined, fieldName: string, min: number, max: number) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (!Number.isInteger(value)) {
+    throw new Error(`${fieldName} must be a whole number.`);
+  }
+
+  if (value < min || value > max) {
+    throw new Error(`${fieldName} must be between ${min} and ${max}.`);
+  }
+
+  return value;
 }

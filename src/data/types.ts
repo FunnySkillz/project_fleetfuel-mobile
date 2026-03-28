@@ -1,10 +1,24 @@
 export type EntryType = 'trip' | 'fuel';
 export type TripPrivateTag = 'private' | 'business' | null;
 
+export type ReceiptAttachment = {
+  uri: string;
+  name: string;
+  mimeType: string | null;
+};
+
 export type VehicleRecord = {
   id: string;
   name: string;
   plate: string;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  ps: number | null;
+  kw: number | null;
+  engineDisplacementCc: number | null;
+  vin: string | null;
+  engineTypeCode: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -20,7 +34,13 @@ export type TripRecord = {
   vehicleId: string;
   occurredAt: string;
   purpose: string;
+  startOdometerKm: number;
+  endOdometerKm: number;
   distanceKm: number;
+  startTime: string | null;
+  endTime: string | null;
+  startLocation: string | null;
+  endLocation: string | null;
   notes: string | null;
   privateTag: TripPrivateTag;
   createdAt: string;
@@ -34,6 +54,11 @@ export type FuelEntryRecord = {
   liters: number;
   totalPrice: number;
   station: string;
+  odometerKm: number | null;
+  avgConsumptionLPer100Km: number | null;
+  receiptUri: string | null;
+  receiptName: string | null;
+  receiptMimeType: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -67,7 +92,13 @@ export type TripEntryDetail = {
   vehicleName: string;
   occurredAt: string;
   purpose: string;
+  startOdometerKm: number;
+  endOdometerKm: number;
   distanceKm: number;
+  startTime: string | null;
+  endTime: string | null;
+  startLocation: string | null;
+  endLocation: string | null;
   notes: string | null;
   privateTag: TripPrivateTag;
 };
@@ -81,6 +112,11 @@ export type FuelEntryDetail = {
   liters: number;
   totalPrice: number;
   station: string;
+  odometerKm: number | null;
+  avgConsumptionLPer100Km: number | null;
+  receiptUri: string | null;
+  receiptName: string | null;
+  receiptMimeType: string | null;
   notes: string | null;
 };
 

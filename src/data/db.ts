@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DATABASE_NAME = 'fleetfuel.db';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 let initPromise: Promise<void> | null = null;
@@ -73,6 +73,56 @@ async function migrateToV2(db: SQLite.SQLiteDatabase) {
   `);
 }
 
+type TableInfoRow = {
+  name: string;
+};
+
+async function addColumnIfMissing(
+  db: SQLite.SQLiteDatabase,
+  tableName: 'vehicles' | 'trips' | 'fuel_entries',
+  columnName: string,
+  columnDefinition: string,
+) {
+  const columns = await db.getAllAsync<TableInfoRow>(`PRAGMA table_info(${tableName});`);
+  const hasColumn = columns.some((column) => column.name === columnName);
+
+  if (hasColumn) {
+    return;
+  }
+
+  await db.execAsync(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition};`);
+}
+
+async function migrateToV3(db: SQLite.SQLiteDatabase) {
+  await addColumnIfMissing(db, 'vehicles', 'make', 'TEXT');
+  await addColumnIfMissing(db, 'vehicles', 'model', 'TEXT');
+  await addColumnIfMissing(db, 'vehicles', 'year', 'INTEGER');
+  await addColumnIfMissing(db, 'vehicles', 'ps', 'INTEGER');
+  await addColumnIfMissing(db, 'vehicles', 'kw', 'INTEGER');
+  await addColumnIfMissing(db, 'vehicles', 'engine_displacement_cc', 'INTEGER');
+  await addColumnIfMissing(db, 'vehicles', 'vin', 'TEXT');
+  await addColumnIfMissing(db, 'vehicles', 'engine_type_code', 'TEXT');
+
+  await addColumnIfMissing(db, 'trips', 'start_odometer_km', 'INTEGER');
+  await addColumnIfMissing(db, 'trips', 'end_odometer_km', 'INTEGER');
+  await addColumnIfMissing(db, 'trips', 'start_time', 'TEXT');
+  await addColumnIfMissing(db, 'trips', 'end_time', 'TEXT');
+  await addColumnIfMissing(db, 'trips', 'start_location', 'TEXT');
+  await addColumnIfMissing(db, 'trips', 'end_location', 'TEXT');
+
+  await addColumnIfMissing(db, 'fuel_entries', 'odometer_km', 'INTEGER');
+  await addColumnIfMissing(db, 'fuel_entries', 'avg_consumption_l_per_100km', 'REAL');
+  await addColumnIfMissing(db, 'fuel_entries', 'receipt_uri', 'TEXT');
+  await addColumnIfMissing(db, 'fuel_entries', 'receipt_name', 'TEXT');
+  await addColumnIfMissing(db, 'fuel_entries', 'receipt_mime_type', 'TEXT');
+
+  await db.execAsync(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_vehicles_vin_active_unique
+    ON vehicles(vin)
+    WHERE deleted_at IS NULL AND vin IS NOT NULL AND vin <> '';
+  `);
+}
+
 async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL;');
   await db.execAsync('PRAGMA foreign_keys = ON;');
@@ -85,6 +135,9 @@ async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   }
   if (currentVersion < 2) {
     await migrateToV2(db);
+  }
+  if (currentVersion < 3) {
+    await migrateToV3(db);
   }
 
   if (currentVersion !== SCHEMA_VERSION) {

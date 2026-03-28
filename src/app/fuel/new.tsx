@@ -1,4 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -7,11 +9,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { fuelRepo, vehiclesRepo } from '@/data/repositories';
-import type { VehicleListItem } from '@/data/types';
+import { entriesRepo, fuelRepo, vehiclesRepo } from '@/data/repositories';
+import type { ReceiptAttachment, VehicleListItem } from '@/data/types';
 import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
-import { parseDecimalValue, sanitizeDecimalInput, trimmedLength } from '@/utils/form-input';
+import { parseDecimalValue, parseIntegerValue, sanitizeDecimalInput, sanitizeIntegerInput, trimmedLength } from '@/utils/form-input';
+import { copyReceiptToAppStorage } from '@/utils/receipt-files';
 
 const LITERS_INTEGER_DIGITS = 3;
 const LITERS_FRACTION_DIGITS = 2;
@@ -22,14 +25,35 @@ const PRICE_MAX = 500000;
 const STATION_MIN = 2;
 const STATION_MAX = 80;
 const NOTES_MAX = 500;
+const ODOMETER_DIGITS = 7;
 
 type FuelFormErrors = {
   vehicleId?: string;
   liters?: string;
   price?: string;
   station?: string;
+  odometer?: string;
   notes?: string;
+  receipt?: string;
 };
+
+function normalizeText(value: string) {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function calculateAvgConsumption(liters: number | null, odometerKm: number | null, previousFuelKm: number | null) {
+  if (liters === null || odometerKm === null || previousFuelKm === null) {
+    return null;
+  }
+
+  const distanceKm = odometerKm - previousFuelKm;
+  if (distanceKm <= 0) {
+    return null;
+  }
+
+  const avg = (liters / distanceKm) * 100;
+  return Math.round(avg * 100) / 100;
+}
 
 export default function AddFuelEntryScreen() {
   const router = useRouter();
@@ -41,13 +65,29 @@ export default function AddFuelEntryScreen() {
   const [vehicles, setVehicles] = useState<VehicleListItem[]>([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
   const [selectedVehicleId, setSelectedVehicleId] = useState((params.vehicleId ?? '').trim());
+
+  const [latestRecordedKm, setLatestRecordedKm] = useState<number | null>(null);
+  const [previousFuelKm, setPreviousFuelKm] = useState<number | null>(null);
+
   const [liters, setLiters] = useState('');
   const [price, setPrice] = useState('');
   const [station, setStation] = useState('');
+  const [odometer, setOdometer] = useState('');
   const [notes, setNotes] = useState('');
+  const [receipt, setReceipt] = useState<ReceiptAttachment | null>(null);
+
   const [saving, setSaving] = useState(false);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [touched, setTouched] = useState({ vehicleId: false, liters: false, price: false, station: false, notes: false });
+  const [touched, setTouched] = useState({
+    vehicleId: false,
+    liters: false,
+    price: false,
+    station: false,
+    odometer: false,
+    notes: false,
+    receipt: false,
+  });
 
   useEffect(() => {
     if (!isFocused) {
@@ -79,14 +119,12 @@ export default function AddFuelEntryScreen() {
         if (cancelled) {
           return;
         }
-
         setVehicles([]);
       })
       .finally(() => {
         if (cancelled) {
           return;
         }
-
         setVehiclesLoading(false);
       });
 
@@ -94,6 +132,45 @@ export default function AddFuelEntryScreen() {
       cancelled = true;
     };
   }, [isFocused]);
+
+  useEffect(() => {
+    if (!selectedVehicleId) {
+      setLatestRecordedKm(null);
+      setPreviousFuelKm(null);
+      setOdometer('');
+      return;
+    }
+
+    let cancelled = false;
+    void Promise.all([
+      entriesRepo.getLatestOdometerKmForVehicle(selectedVehicleId),
+      fuelRepo.getLatestFuelOdometerKmForVehicle(selectedVehicleId),
+    ])
+      .then(([latestKm, previousFuel]) => {
+        if (cancelled) {
+          return;
+        }
+
+        setLatestRecordedKm(latestKm);
+        setPreviousFuelKm(previousFuel);
+        if (latestKm !== null) {
+          setOdometer(String(latestKm));
+        } else {
+          setOdometer('');
+        }
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setLatestRecordedKm(null);
+        setPreviousFuelKm(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVehicleId]);
 
   useEffect(() => {
     if (!selectedVehicleId) {
@@ -106,23 +183,26 @@ export default function AddFuelEntryScreen() {
     }
   }, [selectedVehicleId, vehicles]);
 
+  const litersValue = parseDecimalValue(liters);
+  const priceValue = parseDecimalValue(price);
+  const odometerValue = parseIntegerValue(odometer);
+  const avgConsumptionPreview = calculateAvgConsumption(litersValue, odometerValue, previousFuelKm);
+
   const isDirty = useMemo(
     () =>
       liters.trim().length > 0 ||
       price.trim().length > 0 ||
       station.trim().length > 0 ||
       notes.trim().length > 0 ||
-      saving,
-    [liters, notes, price, saving, station],
+      receipt !== null ||
+      saving ||
+      attachmentBusy,
+    [attachmentBusy, liters, notes, price, receipt, saving, station],
   );
   const { allowNextNavigation } = useUnsavedChangesGuard(isDirty);
 
   const errors = useMemo<FuelFormErrors>(() => {
     const result: FuelFormErrors = {};
-    const litersValue = parseDecimalValue(liters);
-    const priceValue = parseDecimalValue(price);
-    const stationLength = trimmedLength(station);
-    const notesLength = trimmedLength(notes);
 
     if (!selectedVehicleId) {
       result.vehicleId = 'Vehicle is required.';
@@ -148,6 +228,7 @@ export default function AddFuelEntryScreen() {
       result.price = `Total price must be less than or equal to ${PRICE_MAX}.`;
     }
 
+    const stationLength = trimmedLength(station);
     if (stationLength === 0) {
       result.station = 'Station/vendor is required.';
     } else if (stationLength < STATION_MIN) {
@@ -156,41 +237,49 @@ export default function AddFuelEntryScreen() {
       result.station = `Station/vendor must be at most ${STATION_MAX} characters.`;
     }
 
-    if (notesLength > NOTES_MAX) {
+    if (odometer.trim().length === 0) {
+      result.odometer = 'Current km is required.';
+    } else if (odometerValue === null) {
+      result.odometer = 'Current km must be a whole number.';
+    } else if (latestRecordedKm !== null && odometerValue < latestRecordedKm) {
+      result.odometer = `Current km cannot be below latest recorded km (${latestRecordedKm}).`;
+    }
+
+    if (trimmedLength(notes) > NOTES_MAX) {
       result.notes = `Notes must be at most ${NOTES_MAX} characters.`;
     }
 
-    return result;
-  }, [liters, notes, price, selectedVehicleId, station]);
+    if (receipt && !receipt.uri) {
+      result.receipt = 'Attached receipt is invalid.';
+    }
 
-  const isValid = !errors.vehicleId && !errors.liters && !errors.price && !errors.station && !errors.notes;
-  const canSubmit = !saving && isValid;
-  const showVehicleError = (submitAttempted || touched.vehicleId) && Boolean(errors.vehicleId);
-  const showLitersError = (submitAttempted || touched.liters) && Boolean(errors.liters);
-  const showPriceError = (submitAttempted || touched.price) && Boolean(errors.price);
-  const showStationError = (submitAttempted || touched.station) && Boolean(errors.station);
-  const showNotesError = (submitAttempted || touched.notes) && Boolean(errors.notes);
+    return result;
+  }, [latestRecordedKm, liters, litersValue, notes, odometer, odometerValue, price, priceValue, receipt, selectedVehicleId, station]);
+
+  const isValid =
+    !errors.vehicleId && !errors.liters && !errors.price && !errors.station && !errors.odometer && !errors.notes && !errors.receipt;
+
+  const canSubmit = isValid && !saving && !attachmentBusy;
+  const showError = (field: keyof typeof touched) => (submitAttempted || touched[field]) && Boolean(errors[field]);
 
   const handleSave = async () => {
-    if (saving) {
+    if (saving || attachmentBusy) {
       return;
     }
 
     setSubmitAttempted(true);
-    setTouched({ vehicleId: true, liters: true, price: true, station: true, notes: true });
+    setTouched({
+      vehicleId: true,
+      liters: true,
+      price: true,
+      station: true,
+      odometer: true,
+      notes: true,
+      receipt: true,
+    });
 
-    if (!isValid) {
+    if (!isValid || litersValue === null || priceValue === null || odometerValue === null) {
       Alert.alert('Check form', 'Please fix validation errors before saving.');
-      return;
-    }
-
-    const litersValue = parseDecimalValue(liters);
-    const priceValue = parseDecimalValue(price);
-    const normalizedStation = station.trim().replace(/\s+/g, ' ');
-    const normalizedNotes = notes.trim().replace(/\s+/g, ' ');
-
-    if (litersValue === null || priceValue === null) {
-      Alert.alert('Check form', 'Liters and total price must be valid numbers.');
       return;
     }
 
@@ -200,22 +289,140 @@ export default function AddFuelEntryScreen() {
         vehicleId: selectedVehicleId,
         liters: litersValue,
         totalPrice: priceValue,
-        station: normalizedStation,
-        notes: normalizedNotes.length > 0 ? normalizedNotes : null,
+        station: normalizeText(station),
+        odometerKm: odometerValue,
+        receipt,
+        notes: normalizeText(notes) || null,
       });
 
-      setLiters('');
-      setPrice('');
-      setStation('');
-      setNotes('');
-      setTouched({ vehicleId: false, liters: false, price: false, station: false, notes: false });
-      setSubmitAttempted(false);
       allowNextNavigation();
       router.back();
     } catch (error) {
       Alert.alert('Could not save fuel entry', error instanceof Error ? error.message : 'Unexpected error.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const attachFromCamera = async () => {
+    if (attachmentBusy) {
+      return;
+    }
+
+    setAttachmentBusy(true);
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Camera permission needed', 'Enable camera access to take a receipt photo.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+
+      if (result.canceled || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const copied = await copyReceiptToAppStorage({
+        sourceUri: asset.uri,
+        preferredName: asset.fileName ?? 'receipt_photo.jpg',
+        prefix: 'receipt_photo',
+      });
+
+      setReceipt({
+        uri: copied.uri,
+        name: copied.name,
+        mimeType: asset.mimeType ?? 'image/jpeg',
+      });
+      setTouched((prev) => ({ ...prev, receipt: true }));
+    } catch (error) {
+      Alert.alert('Could not attach photo', error instanceof Error ? error.message : 'Unexpected error.');
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
+
+  const attachFromGallery = async () => {
+    if (attachmentBusy) {
+      return;
+    }
+
+    setAttachmentBusy(true);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Photos permission needed', 'Enable photo library access to select a receipt image.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsMultipleSelection: false,
+      });
+
+      if (result.canceled || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const copied = await copyReceiptToAppStorage({
+        sourceUri: asset.uri,
+        preferredName: asset.fileName ?? 'receipt_gallery.jpg',
+        prefix: 'receipt_photo',
+      });
+
+      setReceipt({
+        uri: copied.uri,
+        name: copied.name,
+        mimeType: asset.mimeType ?? 'image/jpeg',
+      });
+      setTouched((prev) => ({ ...prev, receipt: true }));
+    } catch (error) {
+      Alert.alert('Could not attach image', error instanceof Error ? error.message : 'Unexpected error.');
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
+
+  const attachPdf = async () => {
+    if (attachmentBusy) {
+      return;
+    }
+
+    setAttachmentBusy(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const copied = await copyReceiptToAppStorage({
+        sourceUri: asset.uri,
+        preferredName: asset.name ?? 'receipt.pdf',
+        prefix: 'receipt_pdf',
+      });
+
+      setReceipt({
+        uri: copied.uri,
+        name: copied.name,
+        mimeType: asset.mimeType ?? 'application/pdf',
+      });
+      setTouched((prev) => ({ ...prev, receipt: true }));
+    } catch (error) {
+      Alert.alert('Could not attach PDF', error instanceof Error ? error.message : 'Unexpected error.');
+    } finally {
+      setAttachmentBusy(false);
     }
   };
 
@@ -265,30 +472,52 @@ export default function AddFuelEntryScreen() {
               </Pressable>
             </ThemedView>
           )}
-          {showVehicleError ? (
+          {showError('vehicleId') ? (
             <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
               {errors.vehicleId}
+            </ThemedText>
+          ) : null}
+
+          <ThemedText type="smallBold">Current Km (Tacho)</ThemedText>
+          <TextInput
+            value={odometer}
+            onChangeText={(value) => setOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
+            onBlur={() => setTouched((prev) => ({ ...prev, odometer: true }))}
+            keyboardType="numeric"
+            placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : '84210'}
+            placeholderTextColor={theme.textSecondary}
+            style={[
+              styles.input,
+              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
+              showError('odometer') && { borderColor: theme.destructive },
+            ]}
+          />
+          <ThemedText type="small" themeColor="textSecondary">
+            {latestRecordedKm !== null
+              ? `Latest recorded km: ${latestRecordedKm}`
+              : 'No previous odometer record found for this vehicle.'}
+          </ThemedText>
+          {showError('odometer') ? (
+            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
+              {errors.odometer}
             </ThemedText>
           ) : null}
 
           <ThemedText type="smallBold">Liters</ThemedText>
           <TextInput
             value={liters}
-            onChangeText={(value) =>
-              setLiters(sanitizeDecimalInput(value, LITERS_INTEGER_DIGITS, LITERS_FRACTION_DIGITS))
-            }
+            onChangeText={(value) => setLiters(sanitizeDecimalInput(value, LITERS_INTEGER_DIGITS, LITERS_FRACTION_DIGITS))}
             onBlur={() => setTouched((prev) => ({ ...prev, liters: true }))}
             keyboardType="decimal-pad"
             placeholder="42.4"
             placeholderTextColor={theme.textSecondary}
-            autoCorrect={false}
             style={[
               styles.input,
               { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showLitersError && { borderColor: theme.destructive },
+              showError('liters') && { borderColor: theme.destructive },
             ]}
           />
-          {showLitersError ? (
+          {showError('liters') ? (
             <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
               {errors.liters}
             </ThemedText>
@@ -297,21 +526,18 @@ export default function AddFuelEntryScreen() {
           <ThemedText type="smallBold">Total Price</ThemedText>
           <TextInput
             value={price}
-            onChangeText={(value) =>
-              setPrice(sanitizeDecimalInput(value, PRICE_INTEGER_DIGITS, PRICE_FRACTION_DIGITS))
-            }
+            onChangeText={(value) => setPrice(sanitizeDecimalInput(value, PRICE_INTEGER_DIGITS, PRICE_FRACTION_DIGITS))}
             onBlur={() => setTouched((prev) => ({ ...prev, price: true }))}
             keyboardType="decimal-pad"
             placeholder="72.10"
             placeholderTextColor={theme.textSecondary}
-            autoCorrect={false}
             style={[
               styles.input,
               { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showPriceError && { borderColor: theme.destructive },
+              showError('price') && { borderColor: theme.destructive },
             ]}
           />
-          {showPriceError ? (
+          {showError('price') ? (
             <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
               {errors.price}
             </ThemedText>
@@ -330,15 +556,66 @@ export default function AddFuelEntryScreen() {
             style={[
               styles.input,
               { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showStationError && { borderColor: theme.destructive },
+              showError('station') && { borderColor: theme.destructive },
             ]}
           />
           <ThemedText type="small" themeColor="textSecondary" style={styles.counterText}>
             {trimmedLength(station)}/{STATION_MAX}
           </ThemedText>
-          {showStationError ? (
+          {showError('station') ? (
             <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
               {errors.station}
+            </ThemedText>
+          ) : null}
+
+          <ThemedText type="smallBold">Avg Consumption (readonly)</ThemedText>
+          <ThemedView type="backgroundElement" style={styles.readOnlyCard}>
+            <ThemedText type="subtitle">
+              {avgConsumptionPreview !== null ? `${avgConsumptionPreview.toFixed(2)} L / 100 km` : 'Need liters + previous fuel km'}
+            </ThemedText>
+            {previousFuelKm !== null ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                Based on previous fuel record at {previousFuelKm} km.
+              </ThemedText>
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary">
+                First fuel record for this vehicle, so no comparison baseline yet.
+              </ThemedText>
+            )}
+          </ThemedView>
+
+          <ThemedText type="smallBold">Receipt / Evidence (optional)</ThemedText>
+          <View style={styles.attachmentButtons}>
+            <Pressable onPress={() => void attachFromCamera()} disabled={attachmentBusy}>
+              <ThemedView type="backgroundElement" style={styles.attachmentAction}>
+                <ThemedText type="small">Take Photo</ThemedText>
+              </ThemedView>
+            </Pressable>
+            <Pressable onPress={() => void attachFromGallery()} disabled={attachmentBusy}>
+              <ThemedView type="backgroundElement" style={styles.attachmentAction}>
+                <ThemedText type="small">Upload Photo</ThemedText>
+              </ThemedView>
+            </Pressable>
+            <Pressable onPress={() => void attachPdf()} disabled={attachmentBusy}>
+              <ThemedView type="backgroundElement" style={styles.attachmentAction}>
+                <ThemedText type="small">Upload PDF</ThemedText>
+              </ThemedView>
+            </Pressable>
+          </View>
+          {receipt ? (
+            <ThemedView type="backgroundElement" style={styles.receiptCard}>
+              <ThemedText type="smallBold">Attached:</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {receipt.name}
+              </ThemedText>
+              <Pressable onPress={() => setReceipt(null)}>
+                <ThemedText type="link">Remove receipt</ThemedText>
+              </Pressable>
+            </ThemedView>
+          ) : null}
+          {showError('receipt') ? (
+            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
+              {errors.receipt}
             </ThemedText>
           ) : null}
 
@@ -356,13 +633,13 @@ export default function AddFuelEntryScreen() {
               styles.input,
               styles.multiline,
               { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showNotesError && { borderColor: theme.destructive },
+              showError('notes') && { borderColor: theme.destructive },
             ]}
           />
           <ThemedText type="small" themeColor="textSecondary" style={styles.counterText}>
             {trimmedLength(notes)}/{NOTES_MAX}
           </ThemedText>
-          {showNotesError ? (
+          {showError('notes') ? (
             <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
               {errors.notes}
             </ThemedText>
@@ -370,7 +647,9 @@ export default function AddFuelEntryScreen() {
 
           <Pressable onPress={() => void handleSave()} disabled={!canSubmit} accessibilityState={{ disabled: !canSubmit }}>
             <ThemedView type="backgroundElement" style={[styles.primaryAction, !canSubmit && styles.primaryActionDisabled]}>
-              <ThemedText type="smallBold">{saving ? 'Saving...' : 'Save Fuel Entry'}</ThemedText>
+              <ThemedText type="smallBold">
+                {saving ? 'Saving...' : attachmentBusy ? 'Preparing attachment...' : 'Save Fuel Entry'}
+              </ThemedText>
             </ThemedView>
           </Pressable>
         </ScrollView>
@@ -413,6 +692,28 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
+  },
+  readOnlyCard: {
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    gap: Spacing.half,
+  },
+  attachmentButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
+  },
+  attachmentAction: {
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+  },
+  receiptCard: {
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+    gap: Spacing.half,
   },
   multiline: {
     minHeight: 96,

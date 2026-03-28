@@ -14,7 +14,13 @@ type TripDetailRow = {
   vehicle_name: string;
   occurred_at: string;
   purpose: string;
+  start_odometer_km: number | null;
+  end_odometer_km: number | null;
   distance_km: number;
+  start_time: string | null;
+  end_time: string | null;
+  start_location: string | null;
+  end_location: string | null;
   notes: string | null;
   private_tag: TripPrivateTag;
 };
@@ -27,6 +33,11 @@ type FuelDetailRow = {
   liters: number;
   total_price: number;
   station: string;
+  odometer_km: number | null;
+  avg_consumption_l_per_100km: number | null;
+  receipt_uri: string | null;
+  receipt_name: string | null;
+  receipt_mime_type: string | null;
   notes: string | null;
 };
 
@@ -38,7 +49,13 @@ function mapTripDetail(row: TripDetailRow): EntryDetail {
     vehicleName: row.vehicle_name,
     occurredAt: row.occurred_at,
     purpose: row.purpose,
+    startOdometerKm: row.start_odometer_km ?? 0,
+    endOdometerKm: row.end_odometer_km ?? row.distance_km,
     distanceKm: row.distance_km,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    startLocation: row.start_location,
+    endLocation: row.end_location,
     notes: row.notes,
     privateTag: row.private_tag,
   };
@@ -54,6 +71,11 @@ function mapFuelDetail(row: FuelDetailRow): EntryDetail {
     liters: row.liters,
     totalPrice: row.total_price,
     station: row.station,
+    odometerKm: row.odometer_km,
+    avgConsumptionLPer100Km: row.avg_consumption_l_per_100km,
+    receiptUri: row.receipt_uri,
+    receiptName: row.receipt_name,
+    receiptMimeType: row.receipt_mime_type,
     notes: row.notes,
   };
 }
@@ -67,7 +89,13 @@ async function getTripDetailById(db: SQLite.SQLiteDatabase, id: string) {
         v.name AS vehicle_name,
         t.occurred_at,
         t.purpose,
+        t.start_odometer_km,
+        t.end_odometer_km,
         t.distance_km,
+        t.start_time,
+        t.end_time,
+        t.start_location,
+        t.end_location,
         t.notes,
         t.private_tag
       FROM trips t
@@ -92,6 +120,11 @@ async function getFuelDetailById(db: SQLite.SQLiteDatabase, id: string) {
         f.liters,
         f.total_price,
         f.station,
+        f.odometer_km,
+        f.avg_consumption_l_per_100km,
+        f.receipt_uri,
+        f.receipt_name,
+        f.receipt_mime_type,
         f.notes
       FROM fuel_entries f
       INNER JOIN vehicles v ON v.id = f.vehicle_id
@@ -128,6 +161,34 @@ function getMonthRangeIso(referenceIso: string) {
   };
 }
 
+async function getLatestVehicleOdometer(db: SQLite.SQLiteDatabase, vehicleId: string) {
+  const row = await db.getFirstAsync<{ odometer_km: number | null }>(
+    `
+      SELECT odometer_km
+      FROM (
+        SELECT t.end_odometer_km AS odometer_km, t.occurred_at AS occurred_at
+        FROM trips t
+        WHERE t.vehicle_id = ?
+          AND t.deleted_at IS NULL
+          AND t.end_odometer_km IS NOT NULL
+
+        UNION ALL
+
+        SELECT f.odometer_km AS odometer_km, f.occurred_at AS occurred_at
+        FROM fuel_entries f
+        WHERE f.vehicle_id = ?
+          AND f.deleted_at IS NULL
+          AND f.odometer_km IS NOT NULL
+      ) latest
+      ORDER BY latest.occurred_at DESC
+      LIMIT 1
+    `,
+    [vehicleId, vehicleId],
+  );
+
+  return row?.odometer_km ?? null;
+}
+
 export const entriesRepo = {
   async getById(id: string): Promise<EntryDetail | null> {
     const db = await getDatabase();
@@ -143,6 +204,11 @@ export const entriesRepo = {
     }
 
     return null;
+  },
+
+  async getLatestOdometerKmForVehicle(vehicleId: string): Promise<number | null> {
+    const db = await getDatabase();
+    return getLatestVehicleOdometer(db, vehicleId);
   },
 
   async updateEditableFields(

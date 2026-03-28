@@ -146,6 +146,28 @@ export default function VehicleDetailScreen() {
                 </ThemedText>
               </ThemedView>
 
+              <ThemedView type="backgroundElement" style={styles.specsCard}>
+                <ThemedText type="smallBold">Vehicle Specs</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Make/Model: {vehicle.make ?? '-'} {vehicle.model ?? ''}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Year: {vehicle.year ?? '-'}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Power: {vehicle.ps ?? '-'} PS / {vehicle.kw ?? '-'} kW
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Hubraum: {vehicle.engineDisplacementCc ?? '-'} ccm
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  VIN/FIN: {vehicle.vin ?? '-'}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Engine code: {vehicle.engineTypeCode ?? '-'}
+                </ThemedText>
+              </ThemedView>
+
               <View style={styles.actions}>
                 <Pressable
                   onPress={() =>
@@ -241,6 +263,11 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     padding: Spacing.three,
     gap: Spacing.one,
+  },
+  specsCard: {
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+    gap: Spacing.half,
   },
   actions: {
     gap: Spacing.two,

@@ -1,7 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -32,7 +31,6 @@ function DashboardCard({ label, value, helper }: DashboardCardProps) {
 }
 
 export default function DashboardScreen() {
-  const router = useRouter();
   const isFocused = useIsFocused();
   const [carsTracked, setCarsTracked] = useState(0);
   const [tripsThisMonth, setTripsThisMonth] = useState(0);
@@ -98,16 +96,6 @@ export default function DashboardScreen() {
             <DashboardCard label="Trips this month" value={String(tripsThisMonth)} />
             <DashboardCard label="Fuel entries this month" value={String(fuelThisMonth)} />
           </View>
-
-          <ThemedView type="backgroundElement" style={styles.quickActions}>
-            <ThemedText type="smallBold">Quick Navigation</ThemedText>
-            <Pressable onPress={() => router.push('/vehicles')} style={styles.actionButton}>
-              <ThemedText type="link">Open Vehicles</ThemedText>
-            </Pressable>
-            <Pressable onPress={() => router.push('/logs')} style={styles.actionButton}>
-              <ThemedText type="link">Open Logs</ThemedText>
-            </Pressable>
-          </ThemedView>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -141,13 +129,5 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     padding: Spacing.three,
     gap: Spacing.one,
-  },
-  quickActions: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
-  actionButton: {
-    paddingVertical: Spacing.one,
   },
 });

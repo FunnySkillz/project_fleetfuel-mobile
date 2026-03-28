@@ -1,7 +1,7 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -75,30 +75,40 @@ export default function EntryDetailScreen() {
       return;
     }
 
-    Alert.alert(
-      'Delete entry?',
-      'This removes the entry from local history and export results.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              setDeleting(true);
-              try {
-                await entriesRepo.delete(entry.id);
-                router.back();
-              } catch (error) {
-                Alert.alert('Could not delete entry', error instanceof Error ? error.message : 'Unexpected error.');
-              } finally {
-                setDeleting(false);
-              }
-            })();
-          },
+    Alert.alert('Delete entry?', 'This removes the entry from local history and export results.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            setDeleting(true);
+            try {
+              await entriesRepo.delete(entry.id);
+              router.back();
+            } catch (error) {
+              Alert.alert('Could not delete entry', error instanceof Error ? error.message : 'Unexpected error.');
+            } finally {
+              setDeleting(false);
+            }
+          })();
         },
-      ],
-    );
+      },
+    ]);
+  };
+
+  const openReceipt = async () => {
+    if (!entry || entry.type !== 'fuel' || !entry.receiptUri) {
+      return;
+    }
+
+    const supported = await Linking.canOpenURL(entry.receiptUri);
+    if (!supported) {
+      Alert.alert('Cannot open receipt', 'No app can open this file on your device.');
+      return;
+    }
+
+    await Linking.openURL(entry.receiptUri);
   };
 
   return (
@@ -156,9 +166,33 @@ export default function EntryDetailScreen() {
                     <ThemedText type="smallBold">{entry.purpose}</ThemedText>
 
                     <ThemedText type="small" themeColor="textSecondary">
+                      Start Km
+                    </ThemedText>
+                    <ThemedText type="smallBold">{entry.startOdometerKm}</ThemedText>
+
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Current Km
+                    </ThemedText>
+                    <ThemedText type="smallBold">{entry.endOdometerKm}</ThemedText>
+
+                    <ThemedText type="small" themeColor="textSecondary">
                       Distance
                     </ThemedText>
                     <ThemedText type="smallBold">{entry.distanceKm} km</ThemedText>
+
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Time
+                    </ThemedText>
+                    <ThemedText type="smallBold">
+                      {entry.startTime ?? '--:--'} - {entry.endTime ?? '--:--'}
+                    </ThemedText>
+
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Route
+                    </ThemedText>
+                    <ThemedText type="smallBold">
+                      {entry.startLocation ?? 'N/A'} {'->'} {entry.endLocation ?? 'N/A'}
+                    </ThemedText>
 
                     <ThemedText type="small" themeColor="textSecondary">
                       Tag
@@ -181,6 +215,31 @@ export default function EntryDetailScreen() {
                       Station
                     </ThemedText>
                     <ThemedText type="smallBold">{entry.station}</ThemedText>
+
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Odometer
+                    </ThemedText>
+                    <ThemedText type="smallBold">{entry.odometerKm ?? 'N/A'}</ThemedText>
+
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Avg Consumption
+                    </ThemedText>
+                    <ThemedText type="smallBold">
+                      {entry.avgConsumptionLPer100Km !== null
+                        ? `${entry.avgConsumptionLPer100Km.toFixed(2)} L / 100 km`
+                        : 'Not enough data'}
+                    </ThemedText>
+
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Receipt
+                    </ThemedText>
+                    {entry.receiptUri ? (
+                      <Pressable onPress={() => void openReceipt()}>
+                        <ThemedText type="link">{entry.receiptName ?? 'Open receipt'}</ThemedText>
+                      </Pressable>
+                    ) : (
+                      <ThemedText type="smallBold">No receipt attached</ThemedText>
+                    )}
                   </>
                 )}
 
