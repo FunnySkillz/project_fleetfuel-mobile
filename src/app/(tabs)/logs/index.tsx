@@ -1,15 +1,30 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Button, Card, Chip, Input } from '@/components/ui';
+import {
+  Button,
+  Card,
+  DateTimeField,
+  EmptyState,
+  FormField,
+  Input,
+  ListRow,
+  SectionHeader,
+  SelectField,
+} from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { logsRepo, vehiclesRepo } from '@/data/repositories';
-import type { EntrySummary, ExportPreview, LogsExportFilters, TripUsageFilter, VehicleListItem } from '@/data/types';
+import type {
+  EntrySummary,
+  ExportPreview,
+  LogsExportFilters,
+  TripUsageFilter,
+  VehicleListItem,
+} from '@/data/types';
 import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { generateLogsPdf } from '@/services/export/generate-logs-pdf';
@@ -44,6 +59,8 @@ function usageLabel(value: TripUsageFilter) {
 
   return 'Both';
 }
+
+const USAGE_OPTIONS: TripUsageFilter[] = ['both', 'work', 'private', 'unclassified'];
 
 export default function LogsScreen() {
   const router = useRouter();
@@ -294,128 +311,164 @@ export default function LogsScreen() {
     }
   };
 
+  const yearValue = year === null ? 'all' : String(year);
+  const dataScopeValues = [includeFuel ? 'fuel' : null, includeReceipts ? 'receipts' : null].filter(
+    (value): value is string => Boolean(value),
+  );
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <ThemedText type="title" style={styles.title}>
-              Logs Export
-            </ThemedText>
-            <ThemedText themeColor="textSecondary">
-              Export-first workbench. Timeline browsing stays available below as a secondary section.
-            </ThemedText>
-          </View>
+          <SectionHeader
+            title="Logs Export"
+            description="Export-first workbench. Timeline browsing stays available below as a secondary section."
+          />
 
-          <Card className="gap-2 rounded-2xl bg-surface dark:bg-dark-surface">
-            <ThemedText type="smallBold">Vehicle Scope</ThemedText>
-            <View style={styles.rowWrap}>
-              <Chip label="All vehicles" active={allVehiclesScope} onPress={() => setAllVehiclesScope(true)} />
-              <Chip label="Select vehicles" active={!allVehiclesScope} onPress={() => setAllVehiclesScope(false)} />
-            </View>
+          <Card className="gap-3">
+            <FormField label="Vehicle Scope" error={validationError?.includes('Select at least one vehicle') ? validationError : null}>
+              <SelectField
+                options={[
+                  { value: 'all', label: 'All vehicles' },
+                  { value: 'selected', label: 'Select vehicles' },
+                ]}
+                value={allVehiclesScope ? 'all' : 'selected'}
+                onChange={(value) => setAllVehiclesScope(value === 'all')}
+              />
+            </FormField>
 
             {!allVehiclesScope ? (
-              <View style={styles.rowWrap}>
-                {vehicles.map((vehicle) => (
-                  <Chip
-                    key={vehicle.id}
-                    label={`${vehicle.name} (${vehicle.plate})`}
-                    active={selectedVehicleIds.includes(vehicle.id)}
-                    onPress={() => toggleVehicle(vehicle.id)}
+              <FormField label="Vehicles" required>
+                {vehiclesStatus === 'loading' ? (
+                  <Input value="Loading vehicles..." editable={false} variant="subtle" />
+                ) : vehicles.length === 0 ? (
+                  <EmptyState title="No vehicles found" description="Add vehicles before exporting scoped datasets." />
+                ) : (
+                  <SelectField
+                    multi
+                    options={vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.name} (${vehicle.plate})` }))}
+                    values={selectedVehicleIds}
+                    onToggle={toggleVehicle}
                   />
-                ))}
-              </View>
+                )}
+              </FormField>
             ) : null}
 
-            <ThemedText type="smallBold">Period</ThemedText>
-            <View style={styles.rowWrap}>
-              {yearOptions.map((option) => (
-                <Chip
-                  key={option === null ? 'all' : String(option)}
-                  label={option === null ? 'All dates' : String(option)}
-                  active={year === option}
-                  onPress={() => handleSelectYear(option)}
-                />
-              ))}
-            </View>
+            <FormField label="Period">
+              <SelectField
+                options={yearOptions.map((option) => ({
+                  value: option === null ? 'all' : String(option),
+                  label: option === null ? 'All dates' : String(option),
+                }))}
+                value={yearValue}
+                onChange={(value) => {
+                  if (value === 'all') {
+                    handleSelectYear(null);
+                    return;
+                  }
+
+                  const parsedYear = Number.parseInt(value, 10);
+                  handleSelectYear(Number.isNaN(parsedYear) ? null : parsedYear);
+                }}
+              />
+            </FormField>
 
             <View style={styles.rowTwoCols}>
               <View style={styles.col}>
-                <ThemedText type="small">From (optional)</ThemedText>
-                <Input
-                  value={fromDate}
-                  onChangeText={(value) => {
-                    setFromDate(sanitizeDayDateInput(value));
-                    if (value.trim().length > 0) {
-                      setYear(null);
-                    }
-                  }}
-                  placeholder="2026-01-01"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  className="rounded-xl border-surface bg-background dark:border-dark-surface dark:bg-dark-background"
-                />
+                <FormField
+                  label="From (optional)"
+                  error={validationError?.includes('From date') ? validationError : null}>
+                  <DateTimeField
+                    mode="date"
+                    value={fromDate}
+                    onChangeText={(value) => {
+                      setFromDate(sanitizeDayDateInput(value));
+                      if (value.trim().length > 0) {
+                        setYear(null);
+                      }
+                    }}
+                    placeholder="2026-01-01"
+                    tone={validationError?.includes('From date') ? 'destructive' : 'neutral'}
+                  />
+                </FormField>
               </View>
+
               <View style={styles.col}>
-                <ThemedText type="small">To (optional)</ThemedText>
-                <Input
-                  value={toDate}
-                  onChangeText={(value) => {
-                    setToDate(sanitizeDayDateInput(value));
-                    if (value.trim().length > 0) {
-                      setYear(null);
+                <FormField
+                  label="To (optional)"
+                  error={validationError && !validationError.includes('Select at least one vehicle') && !validationError.includes('From date') ? validationError : null}>
+                  <DateTimeField
+                    mode="date"
+                    value={toDate}
+                    onChangeText={(value) => {
+                      setToDate(sanitizeDayDateInput(value));
+                      if (value.trim().length > 0) {
+                        setYear(null);
+                      }
+                    }}
+                    placeholder="2026-12-31"
+                    tone={
+                      validationError &&
+                      !validationError.includes('Select at least one vehicle') &&
+                      !validationError.includes('From date')
+                        ? 'destructive'
+                        : 'neutral'
                     }
-                  }}
-                  placeholder="2026-12-31"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  className="rounded-xl border-surface bg-background dark:border-dark-surface dark:bg-dark-background"
-                />
+                  />
+                </FormField>
               </View>
             </View>
 
-            <ThemedText type="smallBold">Trip Usage Filter</ThemedText>
-            <View style={styles.rowWrap}>
-              {(['both', 'work', 'private', 'unclassified'] as TripUsageFilter[]).map((value) => (
-                <Chip key={value} label={usageLabel(value)} active={usageType === value} onPress={() => setUsageType(value)} />
-              ))}
-            </View>
+            <FormField label="Trip Usage Filter">
+              <SelectField
+                options={USAGE_OPTIONS.map((value) => ({ value, label: usageLabel(value) }))}
+                value={usageType}
+                onChange={(value) => setUsageType(value as TripUsageFilter)}
+              />
+            </FormField>
 
-            <ThemedText type="smallBold">Data Scope</ThemedText>
-            <View style={styles.rowWrap}>
-              <Chip label="Include fuel entries" active={includeFuel} onPress={() => setIncludeFuel((current) => !current)} />
-              <Chip label="Include receipt appendix" active={includeReceipts} onPress={() => setIncludeReceipts((current) => !current)} />
-            </View>
+            <FormField label="Data Scope">
+              <SelectField
+                multi
+                options={[
+                  { value: 'fuel', label: 'Include fuel entries' },
+                  { value: 'receipts', label: 'Include receipt appendix' },
+                ]}
+                values={dataScopeValues}
+                onToggle={(value) => {
+                  if (value === 'fuel') {
+                    setIncludeFuel((current) => !current);
+                  }
+                  if (value === 'receipts') {
+                    setIncludeReceipts((current) => !current);
+                  }
+                }}
+              />
+            </FormField>
 
-            {validationError ? (
-              <ThemedText type="small" style={{ color: theme.destructive }}>
-                {validationError}
-              </ThemedText>
-            ) : null}
-
-            <Card className="gap-1 rounded-xl bg-background dark:bg-dark-background">
-              <ThemedText type="smallBold">Live Export Preview</ThemedText>
+            <Card variant="outline" className="gap-1.5">
+              <Text className="text-sm font-semibold text-text dark:text-dark-text">Live Export Preview</Text>
               {previewStatus === 'loading' ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator color={theme.textSecondary} />
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Calculating export scope...
-                  </ThemedText>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Calculating export scope...</Text>
                 </View>
               ) : previewStatus === 'error' || !preview ? (
-                <ThemedText type="small" style={{ color: theme.destructive }}>
+                <Text className="text-xs text-destructive dark:text-dark-destructive">
                   {previewError ?? 'Could not build preview.'}
-                </ThemedText>
+                </Text>
               ) : (
                 <View style={styles.previewGrid}>
-                  <ThemedText type="small">Vehicles: {preview.vehicleCount}</ThemedText>
-                  <ThemedText type="small">Trips: {preview.tripCount}</ThemedText>
-                  <ThemedText type="small">Fuel entries: {preview.fuelCount}</ThemedText>
-                  <ThemedText type="small">Total distance: {preview.totalDistanceKm} km</ThemedText>
-                  <ThemedText type="small">Work distance: {preview.businessDistanceKm} km</ThemedText>
-                  <ThemedText type="small">Private distance: {preview.privateDistanceKm} km</ThemedText>
-                  <ThemedText type="small">Unclassified: {preview.unclassifiedDistanceKm} km</ThemedText>
-                  <ThemedText type="small">Fuel spend: EUR {preview.fuelSpendTotal.toFixed(2)}</ThemedText>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Vehicles: {preview.vehicleCount}</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Trips: {preview.tripCount}</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Fuel entries: {preview.fuelCount}</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Total distance: {preview.totalDistanceKm} km</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Work distance: {preview.businessDistanceKm} km</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Private distance: {preview.privateDistanceKm} km</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Unclassified: {preview.unclassifiedDistanceKm} km</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
+                    Fuel spend: EUR {preview.fuelSpendTotal.toFixed(2)}
+                  </Text>
                 </View>
               )}
             </Card>
@@ -425,81 +478,71 @@ export default function LogsScreen() {
               label={exportingPdf ? 'Generating PDF...' : 'Generate PDF Export'}
               onPress={() => void handleGeneratePdf()}
               disabled={exportingPdf || Boolean(validationError)}
-              className={(exportingPdf || Boolean(validationError)) ? 'opacity-50' : undefined}
             />
           </Card>
 
-          <Card className="gap-2 rounded-2xl bg-surface dark:bg-dark-surface">
-            <View style={styles.timelineHeader}>
-              <ThemedText type="smallBold">Timeline (Secondary)</ThemedText>
-              <Pressable onPress={() => setShowTimeline((current) => !current)}>
-                <ThemedText type="link">{showTimeline ? 'Hide' : 'Show'}</ThemedText>
-              </Pressable>
-            </View>
+          <Card className="gap-2">
+            <SectionHeader
+              title="Timeline"
+              description="Secondary detail-level navigation inside Logs."
+              actionLabel={showTimeline ? 'Hide' : 'Show'}
+              onAction={() => setShowTimeline((current) => !current)}
+              className="mb-1"
+            />
 
             {showTimeline ? (
               <>
-                <Input
-                  value={timelineSearch}
-                  onChangeText={setTimelineSearch}
-                  placeholder="Search timeline"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  className="rounded-xl border-surface bg-background dark:border-dark-surface dark:bg-dark-background"
-                />
+                <FormField label="Search Timeline">
+                  <Input
+                    value={timelineSearch}
+                    onChangeText={setTimelineSearch}
+                    placeholder="Search timeline"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </FormField>
 
                 {timelineStatus === 'loading' ? (
                   <View style={styles.loadingRow}>
                     <ActivityIndicator color={theme.textSecondary} />
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Loading timeline...
-                    </ThemedText>
+                    <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Loading timeline...</Text>
                   </View>
                 ) : timelineStatus === 'error' ? (
-                  <ThemedText type="small" style={{ color: theme.destructive }}>
+                  <Text className="text-xs text-destructive dark:text-dark-destructive">
                     {timelineError ?? 'Could not load timeline.'}
-                  </ThemedText>
+                  </Text>
                 ) : timelineEntries.length === 0 ? (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    No matching timeline entries.
-                  </ThemedText>
+                  <EmptyState title="No matching timeline entries" description="Adjust filters or search terms." />
                 ) : (
                   timelineEntries.map((entry) => (
-                    <Pressable
+                    <ListRow
                       key={entry.id}
+                      title={entry.type === 'trip' ? 'Trip' : 'Fuel'}
+                      subtitle={`${entry.vehicleName} · ${entry.summary}`}
+                      meta={formatDate(entry.date)}
                       onPress={() =>
                         router.push({
                           pathname: '/entries/[entryId]',
                           params: { entryId: entry.id },
                         })
-                      }>
-                      <ThemedView type="background" style={styles.timelineRow}>
-                        <View style={styles.timelineRowLeft}>
-                          <ThemedText type="smallBold">{entry.type === 'trip' ? 'Trip' : 'Fuel'}</ThemedText>
-                          <ThemedText type="small">{entry.vehicleName}</ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            {entry.summary}
-                          </ThemedText>
-                        </View>
-                        <ThemedText type="small" themeColor="textSecondary">
-                          {formatDate(entry.date)}
-                        </ThemedText>
-                      </ThemedView>
-                    </Pressable>
+                      }
+                    />
                   ))
                 )}
               </>
             ) : (
-              <ThemedText type="small" themeColor="textSecondary">
+              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
                 Open this section when you need detail-level entry navigation.
-              </ThemedText>
+              </Text>
             )}
           </Card>
 
           {vehiclesStatus === 'error' ? (
-            <ThemedText type="small" style={{ color: theme.destructive }}>
-              Vehicles could not be loaded. Export scope may be incomplete.
-            </ThemedText>
+            <Card tone="warning">
+              <Text className="text-xs text-warning dark:text-dark-warning">
+                Vehicles could not be loaded. Export scope may be incomplete.
+              </Text>
+            </Card>
           ) : null}
         </ScrollView>
       </SafeAreaView>
@@ -520,25 +563,12 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.five,
     gap: Spacing.three,
   },
-  header: {
-    gap: Spacing.two,
-  },
-  title: {
-    fontSize: 36,
-    lineHeight: 42,
-  },
-  rowWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.one,
-  },
   rowTwoCols: {
     flexDirection: 'row',
     gap: Spacing.two,
   },
   col: {
     flex: 1,
-    gap: Spacing.one,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -548,25 +578,4 @@ const styles = StyleSheet.create({
   previewGrid: {
     gap: Spacing.half,
   },
-  timelineHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  timelineRow: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.two,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.two,
-    marginTop: Spacing.one,
-  },
-  timelineRowLeft: {
-    flex: 1,
-    gap: Spacing.half,
-  },
 });
-
