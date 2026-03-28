@@ -38,7 +38,7 @@ Define a binary release gate for FleetFuel MVP. MVP ships only when all must-hav
 
 - [ ] PASS: Required loading, empty, and error states exist on all core screens.
   Exit criteria:
-  - Home, Vehicles, Vehicle Detail, Add Trip, Add Fuel, Export, and Settings are covered.
+  - Dashboard, Vehicles, Vehicle Detail, Logs, Add Trip, Add Fuel, Logs Export, and Settings are covered.
 - [ ] PASS: Permission-denied paths provide useful guidance.
   Exit criteria:
   - Camera/photo/file-denied flows explain next steps.
@@ -65,6 +65,9 @@ Define a binary release gate for FleetFuel MVP. MVP ships only when all must-hav
 - [ ] PASS: Export destination is explicit to users.
   Exit criteria:
   - Users can see where files were generated.
+- [ ] PASS: Export entry remains discoverable from Logs.
+  Exit criteria:
+  - `Logs -> Export` route (`/logs/export`) is visible and reachable.
 - [ ] PASS: Users can open/share generated files after export.
 - [ ] PASS: Backup and restore path is understandable from within the app UI.
 
@@ -81,7 +84,7 @@ Define a binary release gate for FleetFuel MVP. MVP ships only when all must-hav
 - [ ] PASS: Add fuel entry.
 - [ ] PASS: Attach receipt.
 - [ ] PASS: Edit and delete flows.
-- [ ] PASS: Export flow.
+- [ ] PASS: Logs timeline and Logs Export flow.
 - [ ] PASS: Backup and restore flow.
 - [ ] PASS: Theme check (light/dark consistency).
 - [ ] PASS: iOS navigation checks (header spacing, swipe-back, no dead-end flows).
@@ -99,4 +102,3 @@ MVP is releasable only when:
 
 - All must-have checklist items are `PASS`.
 - No blocking local-first, data-safety, or navigation QA regressions remain open.
-

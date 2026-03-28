@@ -88,16 +88,19 @@ Notes:
 | --- | --- | --- |
 | Home/Dashboard | `/` | read-only |
 | Vehicles | `/vehicles` | read-only |
+| Add (action sheet trigger) | `tab:add` -> `/trips/new` \| `/fuel/new` \| `/vehicles/new` | mutable actions |
+| Logs | `/logs` | read-only |
 | Vehicle Detail | `/vehicles/[vehicleId]` | read-only |
 | Add Trip | `/trips/new` | mutable |
 | Add Fuel Entry | `/fuel/new` | mutable |
 | Entry Detail/Edit | `/entries/[entryId]` or `/entries/[entryId]/edit` | read-only or mutable |
-| Export | `/export` | mutable |
+| Export (from Logs) | `/logs/export` | mutable |
 | Settings | `/settings` and `/settings/*` | read-only or mutable by subroute |
 
 ## Navigation Concept (MVP)
 
-- Root navigation is tab-based for primary sections: Home, Vehicles, Export, Settings.
+- Root navigation is tab-based for primary sections: Dashboard, Vehicles, Add, Logs, Settings.
+- Add is a center tab trigger that opens an action sheet and routes to create flows.
 - Detail routes are pushed from list routes to preserve native back/swipe-back behavior.
 - Every route is classified before implementation:
   - `read-only`: frictionless back and swipe-back when history exists.
@@ -136,4 +139,3 @@ Notes:
 
 Boundary rule:
 - If a feature requires internet for core operation, user identity roles, shared access, or server-side processing, it is out of MVP scope.
-

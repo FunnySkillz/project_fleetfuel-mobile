@@ -11,10 +11,12 @@ Adapt proven navigation/layout rules from SteuerFuchs to FleetFuel so stack beha
 This guide applies to stack-based routes where native headers are visible, including:
 
 - `/vehicles/[vehicleId]`
+- `/vehicles/new`
 - `/trips/[tripId]`
 - `/fuel/[fuelEntryId]`
 - `/trips/new`
 - `/fuel/new`
+- `/logs/export`
 - `/settings/*`
 
 ## Single Source of Truth for Header Ownership
@@ -50,6 +52,7 @@ Examples:
 - `/fuel/[fuelEntryId]/edit`
 - `/vehicles/new`
 - `/vehicles/[vehicleId]/edit`
+- `/logs/export`
 - `/settings/backup-restore` (when destructive or overwrite actions are active)
 
 Rules:
@@ -95,12 +98,13 @@ This keeps layout deterministic across iOS versions and prevents automatic inset
   - Vehicles list -> Vehicle detail
   - Vehicle detail -> Add trip
   - Vehicle detail -> Add fuel entry
+  - Logs list -> Entry detail
   - Settings cards -> Settings subroutes
 
 ## Tab Scene Background Ownership
 
 - Tab root scene background is owned centrally by tab layout configuration.
-- Root routes (Home, Vehicles, Export, Settings) must not each define conflicting wrapper background colors.
+- Root routes (Dashboard, Vehicles, Logs, Settings) must not each define conflicting wrapper background colors.
 - If a local visual override is needed, document the reason and verify overscroll behavior.
 
 ## Manual QA Checklist
@@ -110,6 +114,5 @@ This keeps layout deterministic across iOS versions and prevents automatic inset
 - [ ] iOS/Android: mutable routes (`Add Trip`, `Add Fuel Entry`, edit routes) block accidental exit with unsaved changes.
 - [ ] iOS/Android: no navigation dead ends when entering detail/settings routes directly.
 - [ ] iOS/Android: rapid repeated taps do not create duplicate route history entries.
-- [ ] iOS/Android: Home, Vehicles, Export, and Settings root routes share consistent background tone.
+- [ ] iOS/Android: Dashboard, Vehicles, Logs, and Settings root routes share consistent background tone.
 - [ ] iOS: overscroll/bounce on root tab scenes does not flash a different background.
-
