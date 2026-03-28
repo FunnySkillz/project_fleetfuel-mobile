@@ -1,3 +1,5 @@
+import type { TripClassification } from '@/data/types';
+
 export function normalizeRequiredText(value: string, fieldName: string) {
   const normalized = value.trim().replace(/\s+/g, ' ');
   if (!normalized) {
@@ -29,6 +31,15 @@ export function assertValidPrivateTag(value: string | null | undefined): 'privat
   }
 
   throw new Error('Invalid private/business tag.');
+}
+
+export function assertRequiredPrivateTag(value: string | null | undefined): TripClassification {
+  const normalized = assertValidPrivateTag(value);
+  if (!normalized) {
+    throw new Error('Trip classification is required (business or private).');
+  }
+
+  return normalized;
 }
 
 export function ensureValidDayDate(value: string | null | undefined, fieldName: string) {

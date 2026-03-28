@@ -4,7 +4,7 @@ import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { nowIso } from '@/data/db-utils';
 import type { EntryDetail, TripPrivateTag } from '@/data/types';
 
-import { assertValidPrivateTag, normalizeOptionalText } from './shared';
+import { assertRequiredPrivateTag, normalizeOptionalText } from './shared';
 
 const NOTES_MAX = 500;
 
@@ -236,8 +236,7 @@ export const entriesRepo = {
 
       if (trip) {
         const nextNotes = notes === undefined ? trip.notes : notes;
-        const nextPrivateTag =
-          patch.privateTag === undefined ? trip.private_tag : assertValidPrivateTag(patch.privateTag);
+        const nextPrivateTag = assertRequiredPrivateTag(patch.privateTag === undefined ? trip.private_tag : patch.privateTag);
 
         await txn.runAsync(
           `

@@ -1,5 +1,18 @@
-import { getDatabase } from '@/data/db';
-import type { EntrySummary, EntryType, LogsQueryFilters, TripPrivateTag } from '@/data/types';
+﻿import { getDatabase } from '@/data/db';
+import { nowIso } from '@/data/db-utils';
+import type {
+  EntrySummary,
+  EntryType,
+  ExportFuelRow,
+  ExportPreview,
+  ExportTripRow,
+  ExportVehicleSection,
+  LogsExportDataset,
+  LogsExportFilters,
+  LogsQueryFilters,
+  TripPrivateTag,
+  TripUsageFilter,
+} from '@/data/types';
 
 import { buildDayRangeIso, normalizeSearch } from './shared';
 
@@ -12,6 +25,64 @@ type EntrySummaryRow = {
   summary: string;
   search_text: string;
   private_tag: TripPrivateTag;
+};
+
+type VehicleScopeRow = {
+  id: string;
+  name: string;
+  plate: string;
+};
+
+type TripExportRow = {
+  id: string;
+  vehicle_id: string;
+  occurred_at: string;
+  purpose: string;
+  start_odometer_km: number | null;
+  end_odometer_km: number | null;
+  distance_km: number;
+  private_tag: TripPrivateTag;
+  start_time: string | null;
+  end_time: string | null;
+  start_location: string | null;
+  end_location: string | null;
+  notes: string | null;
+};
+
+type FuelExportRow = {
+  id: string;
+  vehicle_id: string;
+  occurred_at: string;
+  liters: number;
+  total_price: number;
+  station: string;
+  odometer_km: number | null;
+  avg_consumption_l_per_100km: number | null;
+  receipt_name: string | null;
+  receipt_uri: string | null;
+  notes: string | null;
+};
+
+type NormalizedLogFilters = {
+  type: 'all' | EntryType;
+  vehicleIds: string[];
+  search: string;
+  fromIso: string | null;
+  toIso: string | null;
+  usageType: TripUsageFilter;
+  limit: number | null;
+};
+
+type NormalizedExportFilters = {
+  vehicleIds: string[];
+  fromDate: string | null;
+  toDate: string | null;
+  fromIso: string | null;
+  toIso: string | null;
+  year: number | null;
+  usageType: TripUsageFilter;
+  includeFuel: boolean;
+  includeReceipts: boolean;
 };
 
 function mapEntrySummary(row: EntrySummaryRow): EntrySummary {
@@ -38,62 +109,448 @@ function normalizeType(type: LogsQueryFilters['type']) {
   throw new Error('Unsupported log type filter.');
 }
 
+function normalizeUsageType(value: TripUsageFilter | null | undefined): TripUsageFilter {
+  if (!value || value === 'both') {
+    return 'both';
+  }
+
+  if (value === 'work' || value === 'private' || value === 'unclassified') {
+    return value;
+  }
+
+  throw new Error('Unsupported usage filter.');
+}
+
+function normalizeVehicleIds(value: string[] | null | undefined) {
+  if (!value || value.length === 0) {
+    return [];
+  }
+
+  return Array.from(new Set(value.map((item) => item.trim()).filter((item) => item.length > 0)));
+}
+
+function normalizeYear(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (!Number.isInteger(value)) {
+    throw new Error('Year must be a whole number.');
+  }
+
+  if (value < 2000 || value > 2100) {
+    throw new Error('Year must be between 2000 and 2100.');
+  }
+
+  return value;
+}
+
+function normalizeDateRange(input: {
+  fromDate?: string | null;
+  toDate?: string | null;
+  year?: number | null;
+}) {
+  const fromDate = input.fromDate?.trim() || null;
+  const toDate = input.toDate?.trim() || null;
+  const year = normalizeYear(input.year ?? null);
+
+  let normalizedFromDate = fromDate;
+  let normalizedToDate = toDate;
+
+  if (!normalizedFromDate && !normalizedToDate && year !== null) {
+    normalizedFromDate = `${year}-01-01`;
+    normalizedToDate = `${year}-12-31`;
+  }
+
+  const fromIso = buildDayRangeIso(normalizedFromDate, 'start');
+  const toIso = buildDayRangeIso(normalizedToDate, 'end');
+
+  if (fromIso && toIso && fromIso > toIso) {
+    throw new Error('From date must be earlier than or equal to To date.');
+  }
+
+  return {
+    fromDate: normalizedFromDate,
+    toDate: normalizedToDate,
+    fromIso,
+    toIso,
+    year,
+  };
+}
+
+function appendVehicleScopeClause(whereClauses: string[], params: Array<string | number>, vehicleIds: string[], column: string) {
+  if (vehicleIds.length === 0) {
+    return;
+  }
+
+  const placeholders = vehicleIds.map(() => '?').join(', ');
+  whereClauses.push(`${column} IN (${placeholders})`);
+  params.push(...vehicleIds);
+}
+
+function appendDateRangeClause(
+  whereClauses: string[],
+  params: Array<string | number>,
+  fromIso: string | null,
+  toIso: string | null,
+  column: string,
+) {
+  if (fromIso) {
+    whereClauses.push(`${column} >= ?`);
+    params.push(fromIso);
+  }
+
+  if (toIso) {
+    whereClauses.push(`${column} <= ?`);
+    params.push(toIso);
+  }
+}
+
+function appendTripUsageClause(whereClauses: string[], usageType: TripUsageFilter, column: string) {
+  if (usageType === 'both') {
+    return;
+  }
+
+  if (usageType === 'work') {
+    whereClauses.push(`${column} = 'business'`);
+    return;
+  }
+
+  if (usageType === 'private') {
+    whereClauses.push(`${column} = 'private'`);
+    return;
+  }
+
+  whereClauses.push(`${column} IS NULL`);
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function mapTripExportRow(row: TripExportRow): ExportTripRow {
+  return {
+    id: row.id,
+    vehicleId: row.vehicle_id,
+    occurredAt: row.occurred_at,
+    purpose: row.purpose,
+    startOdometerKm: row.start_odometer_km ?? 0,
+    endOdometerKm: row.end_odometer_km ?? row.distance_km,
+    distanceKm: row.distance_km,
+    privateTag: row.private_tag,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    startLocation: row.start_location,
+    endLocation: row.end_location,
+    notes: row.notes,
+  };
+}
+
+function mapFuelExportRow(row: FuelExportRow): ExportFuelRow {
+  return {
+    id: row.id,
+    vehicleId: row.vehicle_id,
+    occurredAt: row.occurred_at,
+    liters: row.liters,
+    totalPrice: row.total_price,
+    station: row.station,
+    odometerKm: row.odometer_km,
+    avgConsumptionLPer100Km: row.avg_consumption_l_per_100km,
+    receiptName: row.receipt_name,
+    receiptUri: row.receipt_uri,
+    notes: row.notes,
+  };
+}
+
+function buildExportPreview(scope: VehicleScopeRow[], trips: ExportTripRow[], fuelEntries: ExportFuelRow[]): ExportPreview {
+  const distanceTotals = trips.reduce(
+    (acc, trip) => {
+      acc.total += trip.distanceKm;
+      if (trip.privateTag === 'business') {
+        acc.business += trip.distanceKm;
+      } else if (trip.privateTag === 'private') {
+        acc.private += trip.distanceKm;
+      } else {
+        acc.unclassified += trip.distanceKm;
+      }
+
+      return acc;
+    },
+    { total: 0, business: 0, private: 0, unclassified: 0 },
+  );
+
+  const spendTotal = fuelEntries.reduce((acc, fuel) => acc + fuel.totalPrice, 0);
+  const avgConsumptionValues = fuelEntries
+    .map((fuel) => fuel.avgConsumptionLPer100Km)
+    .filter((value): value is number => value !== null);
+  const avgConsumption =
+    avgConsumptionValues.length > 0
+      ? round2(avgConsumptionValues.reduce((acc, value) => acc + value, 0) / avgConsumptionValues.length)
+      : null;
+
+  return {
+    vehicleCount: scope.length,
+    tripCount: trips.length,
+    fuelCount: fuelEntries.length,
+    totalDistanceKm: distanceTotals.total,
+    businessDistanceKm: distanceTotals.business,
+    privateDistanceKm: distanceTotals.private,
+    unclassifiedDistanceKm: distanceTotals.unclassified,
+    fuelSpendTotal: round2(spendTotal),
+    avgConsumptionLPer100Km: avgConsumption,
+  };
+}
+
+function toExportFilters(filters: NormalizedExportFilters): LogsExportFilters {
+  return {
+    vehicleIds: filters.vehicleIds,
+    fromDate: filters.fromDate,
+    toDate: filters.toDate,
+    year: filters.year,
+    usageType: filters.usageType,
+    includeFuel: filters.includeFuel,
+    includeReceipts: filters.includeReceipts,
+  };
+}
+
+async function resolveVehicleScope(db: Awaited<ReturnType<typeof getDatabase>>, vehicleIds: string[]): Promise<VehicleScopeRow[]> {
+  const whereClauses: string[] = ['deleted_at IS NULL'];
+  const params: Array<string | number> = [];
+
+  appendVehicleScopeClause(whereClauses, params, vehicleIds, 'id');
+
+  return db.getAllAsync<VehicleScopeRow>(
+    `
+      SELECT id, name, plate
+      FROM vehicles
+      WHERE ${whereClauses.join(' AND ')}
+      ORDER BY lower(name) ASC, created_at DESC
+    `,
+    params,
+  );
+}
+
+async function queryTripsForExport(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  filters: NormalizedExportFilters,
+): Promise<ExportTripRow[]> {
+  const whereClauses: string[] = ['t.deleted_at IS NULL'];
+  const params: Array<string | number> = [];
+
+  appendVehicleScopeClause(whereClauses, params, filters.vehicleIds, 't.vehicle_id');
+  appendDateRangeClause(whereClauses, params, filters.fromIso, filters.toIso, 't.occurred_at');
+  appendTripUsageClause(whereClauses, filters.usageType, 't.private_tag');
+
+  const rows = await db.getAllAsync<TripExportRow>(
+    `
+      SELECT
+        t.id,
+        t.vehicle_id,
+        t.occurred_at,
+        t.purpose,
+        t.start_odometer_km,
+        t.end_odometer_km,
+        t.distance_km,
+        t.private_tag,
+        t.start_time,
+        t.end_time,
+        t.start_location,
+        t.end_location,
+        t.notes
+      FROM trips t
+      WHERE ${whereClauses.join(' AND ')}
+      ORDER BY t.occurred_at DESC, t.created_at DESC
+    `,
+    params,
+  );
+
+  return rows.map(mapTripExportRow);
+}
+
+async function queryFuelForExport(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  filters: NormalizedExportFilters,
+): Promise<ExportFuelRow[]> {
+  if (!filters.includeFuel) {
+    return [];
+  }
+
+  const whereClauses: string[] = ['f.deleted_at IS NULL'];
+  const params: Array<string | number> = [];
+
+  appendVehicleScopeClause(whereClauses, params, filters.vehicleIds, 'f.vehicle_id');
+  appendDateRangeClause(whereClauses, params, filters.fromIso, filters.toIso, 'f.occurred_at');
+
+  const rows = await db.getAllAsync<FuelExportRow>(
+    `
+      SELECT
+        f.id,
+        f.vehicle_id,
+        f.occurred_at,
+        f.liters,
+        f.total_price,
+        f.station,
+        f.odometer_km,
+        f.avg_consumption_l_per_100km,
+        f.receipt_name,
+        f.receipt_uri,
+        f.notes
+      FROM fuel_entries f
+      WHERE ${whereClauses.join(' AND ')}
+      ORDER BY f.occurred_at DESC, f.created_at DESC
+    `,
+    params,
+  );
+
+  return rows.map(mapFuelExportRow);
+}
+
+function groupVehicleSections(
+  scope: VehicleScopeRow[],
+  trips: ExportTripRow[],
+  fuelEntries: ExportFuelRow[],
+): ExportVehicleSection[] {
+  const tripsByVehicle = new Map<string, ExportTripRow[]>();
+  for (const trip of trips) {
+    const list = tripsByVehicle.get(trip.vehicleId) ?? [];
+    list.push(trip);
+    tripsByVehicle.set(trip.vehicleId, list);
+  }
+
+  const fuelByVehicle = new Map<string, ExportFuelRow[]>();
+  for (const fuel of fuelEntries) {
+    const list = fuelByVehicle.get(fuel.vehicleId) ?? [];
+    list.push(fuel);
+    fuelByVehicle.set(fuel.vehicleId, list);
+  }
+
+  return scope.map((vehicle) => {
+    const vehicleTrips = tripsByVehicle.get(vehicle.id) ?? [];
+    const vehicleFuelEntries = fuelByVehicle.get(vehicle.id) ?? [];
+
+    const totals = vehicleTrips.reduce(
+      (acc, trip) => {
+        acc.distanceKm += trip.distanceKm;
+        if (trip.privateTag === 'business') {
+          acc.businessDistanceKm += trip.distanceKm;
+        } else if (trip.privateTag === 'private') {
+          acc.privateDistanceKm += trip.distanceKm;
+        } else {
+          acc.unclassifiedDistanceKm += trip.distanceKm;
+        }
+
+        return acc;
+      },
+      {
+        tripCount: vehicleTrips.length,
+        fuelCount: vehicleFuelEntries.length,
+        distanceKm: 0,
+        businessDistanceKm: 0,
+        privateDistanceKm: 0,
+        unclassifiedDistanceKm: 0,
+        fuelSpendTotal: 0,
+      },
+    );
+
+    totals.fuelSpendTotal = round2(vehicleFuelEntries.reduce((acc, fuel) => acc + fuel.totalPrice, 0));
+
+    return {
+      vehicleId: vehicle.id,
+      vehicleName: vehicle.name,
+      vehiclePlate: vehicle.plate,
+      trips: vehicleTrips,
+      fuelEntries: vehicleFuelEntries,
+      totals,
+    };
+  });
+}
+
+function normalizeLogFilters(filters: LogsQueryFilters): NormalizedLogFilters {
+  const type = normalizeType(filters.type);
+  const vehicleIds = normalizeVehicleIds(filters.vehicleIds);
+  const search = normalizeSearch(filters.search);
+  const { fromIso, toIso } = normalizeDateRange({
+    fromDate: filters.fromDate,
+    toDate: filters.toDate,
+    year: filters.year,
+  });
+
+  let limit: number | null = null;
+  if (typeof filters.limit === 'number') {
+    if (!Number.isInteger(filters.limit) || filters.limit <= 0) {
+      throw new Error('Limit must be a positive integer.');
+    }
+    limit = filters.limit;
+  }
+
+  return {
+    type,
+    vehicleIds,
+    search,
+    fromIso,
+    toIso,
+    usageType: normalizeUsageType(filters.usageType),
+    limit,
+  };
+}
+
+function normalizeExportFilters(input: Partial<LogsExportFilters> = {}): NormalizedExportFilters {
+  const vehicleIds = normalizeVehicleIds(input.vehicleIds);
+  const dateRange = normalizeDateRange({
+    fromDate: input.fromDate,
+    toDate: input.toDate,
+    year: input.year,
+  });
+
+  return {
+    vehicleIds,
+    fromDate: dateRange.fromDate,
+    toDate: dateRange.toDate,
+    fromIso: dateRange.fromIso,
+    toIso: dateRange.toIso,
+    year: dateRange.year,
+    usageType: normalizeUsageType(input.usageType),
+    includeFuel: input.includeFuel ?? true,
+    includeReceipts: input.includeReceipts ?? false,
+  };
+}
+
 export const logsRepo = {
+  normalizeExportFilters,
+
   async list(filters: LogsQueryFilters = {}): Promise<EntrySummary[]> {
     const db = await getDatabase();
-    const typeFilter = normalizeType(filters.type);
-    const vehicleId = (filters.vehicleId ?? '').trim();
-    const search = normalizeSearch(filters.search);
-    const searchLike = `%${search}%`;
-    const fromIso = buildDayRangeIso(filters.fromDate, 'start');
-    const toIso = buildDayRangeIso(filters.toDate, 'end');
-    const businessOnly = Boolean(filters.businessOnly);
-
-    if (fromIso && toIso && fromIso > toIso) {
-      throw new Error('From date must be earlier than or equal to To date.');
-    }
-
-    const whereClauses: string[] = [];
+    const normalized = normalizeLogFilters(filters);
     const params: Array<string | number> = [];
+    const whereClauses: string[] = [];
 
-    if (typeFilter !== 'all') {
+    if (normalized.type !== 'all') {
       whereClauses.push('e.type = ?');
-      params.push(typeFilter);
+      params.push(normalized.type);
     }
 
-    if (vehicleId.length > 0) {
-      whereClauses.push('e.vehicle_id = ?');
-      params.push(vehicleId);
-    }
+    appendVehicleScopeClause(whereClauses, params, normalized.vehicleIds, 'e.vehicle_id');
 
-    if (search.length > 0) {
+    if (normalized.search.length > 0) {
       whereClauses.push('e.search_text LIKE ?');
-      params.push(searchLike);
+      params.push(`%${normalized.search}%`);
     }
 
-    if (fromIso) {
-      whereClauses.push('e.occurred_at >= ?');
-      params.push(fromIso);
-    }
+    appendDateRangeClause(whereClauses, params, normalized.fromIso, normalized.toIso, 'e.occurred_at');
 
-    if (toIso) {
-      whereClauses.push('e.occurred_at <= ?');
-      params.push(toIso);
-    }
-
-    if (businessOnly) {
-      whereClauses.push("e.private_tag = 'business'");
+    if (normalized.usageType === 'work') {
+      whereClauses.push("(e.type = 'trip' AND e.private_tag = 'business')");
+    } else if (normalized.usageType === 'private') {
+      whereClauses.push("(e.type = 'trip' AND e.private_tag = 'private')");
+    } else if (normalized.usageType === 'unclassified') {
+      whereClauses.push("(e.type = 'trip' AND e.private_tag IS NULL)");
     }
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-    let limitSql = '';
-    if (typeof filters.limit === 'number') {
-      if (!Number.isInteger(filters.limit) || filters.limit <= 0) {
-        throw new Error('Limit must be a positive integer.');
-      }
-      limitSql = 'LIMIT ?';
-      params.push(filters.limit);
+    const limitSql = normalized.limit ? 'LIMIT ?' : '';
+    if (normalized.limit) {
+      params.push(normalized.limit);
     }
 
     const rows = await db.getAllAsync<EntrySummaryRow>(
@@ -162,4 +619,58 @@ export const logsRepo = {
 
     return rows.map(mapEntrySummary);
   },
+
+  async getExportDataset(input: Partial<LogsExportFilters> = {}): Promise<LogsExportDataset> {
+    const db = await getDatabase();
+    const filters = normalizeExportFilters(input);
+
+    const scope = await resolveVehicleScope(db, filters.vehicleIds);
+
+    if (scope.length === 0) {
+      const emptyPreview: ExportPreview = {
+        vehicleCount: 0,
+        tripCount: 0,
+        fuelCount: 0,
+        totalDistanceKm: 0,
+        businessDistanceKm: 0,
+        privateDistanceKm: 0,
+        unclassifiedDistanceKm: 0,
+        fuelSpendTotal: 0,
+        avgConsumptionLPer100Km: null,
+      };
+
+      return {
+        generatedAt: nowIso(),
+        filters: toExportFilters(filters),
+        preview: emptyPreview,
+        vehicles: [],
+      };
+    }
+
+    const scopedFilters: NormalizedExportFilters = {
+      ...filters,
+      vehicleIds: scope.map((vehicle) => vehicle.id),
+    };
+
+    const [trips, fuelEntries] = await Promise.all([
+      queryTripsForExport(db, scopedFilters),
+      queryFuelForExport(db, scopedFilters),
+    ]);
+
+    const preview = buildExportPreview(scope, trips, fuelEntries);
+    const vehicles = groupVehicleSections(scope, trips, fuelEntries);
+
+    return {
+      generatedAt: nowIso(),
+      filters: toExportFilters(filters),
+      preview,
+      vehicles,
+    };
+  },
+
+  async getExportPreview(input: Partial<LogsExportFilters> = {}): Promise<ExportPreview> {
+    const dataset = await logsRepo.getExportDataset(input);
+    return dataset.preview;
+  },
 };
+

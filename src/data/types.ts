@@ -1,5 +1,7 @@
 export type EntryType = 'trip' | 'fuel';
-export type TripPrivateTag = 'private' | 'business' | null;
+export type TripClassification = 'private' | 'business';
+export type TripPrivateTag = TripClassification | null;
+export type TripUsageFilter = 'both' | 'work' | 'private' | 'unclassified';
 
 export type ReceiptAttachment = {
   uri: string;
@@ -77,12 +79,130 @@ export type EntrySummary = {
 
 export type LogsQueryFilters = {
   type?: 'all' | EntryType;
-  vehicleId?: string | null;
+  vehicleIds?: string[];
   search?: string;
   fromDate?: string | null;
   toDate?: string | null;
-  businessOnly?: boolean;
+  year?: number | null;
+  usageType?: TripUsageFilter;
   limit?: number;
+};
+
+export type LogsExportFilters = {
+  vehicleIds: string[];
+  fromDate: string | null;
+  toDate: string | null;
+  year: number | null;
+  usageType: TripUsageFilter;
+  includeFuel: boolean;
+  includeReceipts: boolean;
+};
+
+export type ExportPreview = {
+  vehicleCount: number;
+  tripCount: number;
+  fuelCount: number;
+  totalDistanceKm: number;
+  businessDistanceKm: number;
+  privateDistanceKm: number;
+  unclassifiedDistanceKm: number;
+  fuelSpendTotal: number;
+  avgConsumptionLPer100Km: number | null;
+};
+
+export type ExportTripRow = {
+  id: string;
+  vehicleId: string;
+  occurredAt: string;
+  purpose: string;
+  startOdometerKm: number;
+  endOdometerKm: number;
+  distanceKm: number;
+  privateTag: TripPrivateTag;
+  startTime: string | null;
+  endTime: string | null;
+  startLocation: string | null;
+  endLocation: string | null;
+  notes: string | null;
+};
+
+export type ExportFuelRow = {
+  id: string;
+  vehicleId: string;
+  occurredAt: string;
+  liters: number;
+  totalPrice: number;
+  station: string;
+  odometerKm: number | null;
+  avgConsumptionLPer100Km: number | null;
+  receiptName: string | null;
+  receiptUri: string | null;
+  notes: string | null;
+};
+
+export type ExportVehicleSection = {
+  vehicleId: string;
+  vehicleName: string;
+  vehiclePlate: string;
+  trips: ExportTripRow[];
+  fuelEntries: ExportFuelRow[];
+  totals: {
+    tripCount: number;
+    fuelCount: number;
+    distanceKm: number;
+    businessDistanceKm: number;
+    privateDistanceKm: number;
+    unclassifiedDistanceKm: number;
+    fuelSpendTotal: number;
+  };
+};
+
+export type LogsExportDataset = {
+  generatedAt: string;
+  filters: LogsExportFilters;
+  preview: ExportPreview;
+  vehicles: ExportVehicleSection[];
+};
+
+export type VehicleMonthlyDistancePoint = {
+  monthKey: string;
+  monthLabel: string;
+  distanceKm: number;
+};
+
+export type VehicleUsageSplitPoint = {
+  key: 'business' | 'private' | 'unclassified';
+  label: string;
+  distanceKm: number;
+  ratio: number;
+};
+
+export type VehicleRecentTrip = {
+  id: string;
+  occurredAt: string;
+  purpose: string;
+  distanceKm: number;
+  privateTag: TripPrivateTag;
+  startTime: string | null;
+  endTime: string | null;
+  startLocation: string | null;
+  endLocation: string | null;
+};
+
+export type VehicleInsightSummary = {
+  vehicle: VehicleRecord;
+  kpis: {
+    totalTrips: number;
+    totalDistanceKm: number;
+    businessDistanceKm: number;
+    privateDistanceKm: number;
+    unclassifiedDistanceKm: number;
+    fuelSpendTotal: number;
+    avgConsumptionLPer100Km: number | null;
+  };
+  monthlyDistance: VehicleMonthlyDistancePoint[];
+  usageSplit: VehicleUsageSplitPoint[];
+  recentTrips: VehicleRecentTrip[];
 };
 
 export type TripEntryDetail = {

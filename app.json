@@ -42,7 +42,8 @@
           "photosPermission": "FleetFuel needs photo library access so you can attach receipt photos.",
           "cameraPermission": "FleetFuel needs camera access so you can capture receipt photos."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

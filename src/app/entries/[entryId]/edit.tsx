@@ -17,6 +17,7 @@ const NOTES_MAX = 500;
 
 type EditEntryErrors = {
   notes?: string;
+  privateTag?: string;
 };
 
 function normalizeNotes(value: string) {
@@ -37,7 +38,7 @@ export default function EditEntryScreen() {
   const [notes, setNotes] = useState('');
   const [privateTag, setPrivateTag] = useState<TripPrivateTag>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [touched, setTouched] = useState({ notes: false });
+  const [touched, setTouched] = useState({ notes: false, privateTag: false });
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -74,7 +75,7 @@ export default function EditEntryScreen() {
       setNotes(nextNotes);
       setPrivateTag(nextPrivateTag);
       setSubmitAttempted(false);
-      setTouched({ notes: false });
+      setTouched({ notes: false, privateTag: false });
       setStatus('ready');
     } catch (error) {
       setStatus('error');
@@ -98,8 +99,12 @@ export default function EditEntryScreen() {
       result.notes = `Notes must be at most ${NOTES_MAX} characters.`;
     }
 
+    if (entry?.type === 'trip' && privateTag === null) {
+      result.privateTag = 'Trip classification is required (Business or Private).';
+    }
+
     return result;
-  }, [notes]);
+  }, [entry?.type, notes, privateTag]);
 
   const normalizedNotes = normalizeNotes(notes);
   const isDirty =
@@ -108,7 +113,7 @@ export default function EditEntryScreen() {
     saving;
   const { allowNextNavigation } = useUnsavedChangesGuard(Boolean(isDirty));
 
-  const isValid = !errors.notes;
+  const isValid = !errors.notes && !errors.privateTag;
   const canSubmit = status === 'ready' && !saving && isValid && Boolean(entry) && Boolean(isDirty);
   const showNotesError = (submitAttempted || touched.notes) && Boolean(errors.notes);
 
@@ -118,7 +123,7 @@ export default function EditEntryScreen() {
     }
 
     setSubmitAttempted(true);
-    setTouched({ notes: true });
+    setTouched({ notes: true, privateTag: true });
 
     if (!isValid) {
       Alert.alert('Check form', 'Please fix validation errors before saving.');
@@ -173,20 +178,28 @@ export default function EditEntryScreen() {
               {entry.type === 'trip' ? (
                 <>
                   <ThemedText type="smallBold">Private/Business Tag</ThemedText>
+                  {privateTag === null ? (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Legacy entry is unclassified. Select Business or Private before saving.
+                    </ThemedText>
+                  ) : null}
                   <View style={styles.tagRow}>
-                    <Pressable onPress={() => setPrivateTag(null)}>
-                      <ThemedView type={privateTag === null ? 'backgroundSelected' : 'backgroundElement'} style={styles.tagChip}>
-                        <ThemedText type="small">None</ThemedText>
-                      </ThemedView>
-                    </Pressable>
-                    <Pressable onPress={() => setPrivateTag('business')}>
+                    <Pressable
+                      onPress={() => {
+                        setPrivateTag('business');
+                        setTouched((prev) => ({ ...prev, privateTag: true }));
+                      }}>
                       <ThemedView
                         type={privateTag === 'business' ? 'backgroundSelected' : 'backgroundElement'}
                         style={styles.tagChip}>
                         <ThemedText type="small">Business</ThemedText>
                       </ThemedView>
                     </Pressable>
-                    <Pressable onPress={() => setPrivateTag('private')}>
+                    <Pressable
+                      onPress={() => {
+                        setPrivateTag('private');
+                        setTouched((prev) => ({ ...prev, privateTag: true }));
+                      }}>
                       <ThemedView
                         type={privateTag === 'private' ? 'backgroundSelected' : 'backgroundElement'}
                         style={styles.tagChip}>
@@ -194,6 +207,11 @@ export default function EditEntryScreen() {
                       </ThemedView>
                     </Pressable>
                   </View>
+                  {(submitAttempted || touched.privateTag) && errors.privateTag ? (
+                    <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
+                      {errors.privateTag}
+                    </ThemedText>
+                  ) : null}
                 </>
               ) : null}
 
@@ -201,7 +219,7 @@ export default function EditEntryScreen() {
               <TextInput
                 value={notes}
                 onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
-                onBlur={() => setTouched({ notes: true })}
+                onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
                 placeholder="Update notes"
                 placeholderTextColor={theme.textSecondary}
                 autoCapitalize="sentences"

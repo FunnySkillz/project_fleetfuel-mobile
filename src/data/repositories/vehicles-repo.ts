@@ -2,7 +2,15 @@ import type * as SQLite from 'expo-sqlite';
 
 import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { createId, nowIso } from '@/data/db-utils';
-import type { VehicleListItem, VehicleRecord } from '@/data/types';
+import type {
+  TripPrivateTag,
+  VehicleInsightSummary,
+  VehicleListItem,
+  VehicleMonthlyDistancePoint,
+  VehicleRecentTrip,
+  VehicleRecord,
+  VehicleUsageSplitPoint,
+} from '@/data/types';
 
 import { normalizeOptionalInteger, normalizeOptionalText, normalizePlate, normalizeRequiredText, normalizeSearch } from './shared';
 
@@ -10,6 +18,9 @@ const VEHICLE_NAME_MIN = 2;
 const VEHICLE_NAME_MAX = 60;
 const TEXT_FIELD_MAX = 80;
 const ENGINE_CODE_MAX = 40;
+const INSIGHT_MONTHS_DEFAULT = 6;
+const RECENT_TRIPS_LIMIT_DEFAULT = 6;
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 type VehicleRow = {
   id: string;
@@ -31,6 +42,33 @@ type VehicleListRow = VehicleRow & {
   trip_count: number;
   fuel_count: number;
   last_activity_at: string | null;
+};
+
+type VehicleInsightKpiRow = {
+  total_trips: number;
+  total_distance_km: number;
+  business_distance_km: number;
+  private_distance_km: number;
+  unclassified_distance_km: number;
+  fuel_spend_total: number;
+  avg_consumption_l_per_100km: number | null;
+};
+
+type VehicleMonthlyDistanceRow = {
+  month_key: string;
+  distance_km: number;
+};
+
+type VehicleRecentTripRow = {
+  id: string;
+  occurred_at: string;
+  purpose: string;
+  distance_km: number;
+  private_tag: TripPrivateTag;
+  start_time: string | null;
+  end_time: string | null;
+  start_location: string | null;
+  end_location: string | null;
 };
 
 type VehicleWriteInput = {
@@ -84,6 +122,78 @@ function mapVehicleListItem(row: VehicleListRow): VehicleListItem {
     fuelCount: row.fuel_count,
     lastActivityAt: row.last_activity_at,
   };
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function startOfMonthUtc(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
+}
+
+function monthKey(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(date: Date) {
+  return `${MONTH_LABELS[date.getUTCMonth()]} ${String(date.getUTCFullYear()).slice(-2)}`;
+}
+
+function buildMonthlyDistanceSeries(
+  rows: VehicleMonthlyDistanceRow[],
+  monthCount: number,
+  referenceDate: Date = new Date(),
+): VehicleMonthlyDistancePoint[] {
+  const safeMonthCount = clamp(monthCount, 3, 12);
+  const values = new Map(rows.map((row) => [row.month_key, row.distance_km]));
+  const series: VehicleMonthlyDistancePoint[] = [];
+
+  for (let offset = safeMonthCount - 1; offset >= 0; offset -= 1) {
+    const date = startOfMonthUtc(new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() - offset, 1)));
+    const key = monthKey(date);
+
+    series.push({
+      monthKey: key,
+      monthLabel: monthLabel(date),
+      distanceKm: values.get(key) ?? 0,
+    });
+  }
+
+  return series;
+}
+
+function mapRecentTrip(row: VehicleRecentTripRow): VehicleRecentTrip {
+  return {
+    id: row.id,
+    occurredAt: row.occurred_at,
+    purpose: row.purpose,
+    distanceKm: row.distance_km,
+    privateTag: row.private_tag,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    startLocation: row.start_location,
+    endLocation: row.end_location,
+  };
+}
+
+function buildUsageSplitPoints(kpi: VehicleInsightKpiRow): VehicleUsageSplitPoint[] {
+  const total = kpi.total_distance_km;
+
+  const entries: Array<{ key: VehicleUsageSplitPoint['key']; label: string; distanceKm: number }> = [
+    { key: 'business', label: 'Business', distanceKm: kpi.business_distance_km },
+    { key: 'private', label: 'Private', distanceKm: kpi.private_distance_km },
+    { key: 'unclassified', label: 'Unclassified', distanceKm: kpi.unclassified_distance_km },
+  ];
+
+  return entries.map((entry) => ({
+    ...entry,
+    ratio: total > 0 ? entry.distanceKm / total : 0,
+  }));
 }
 
 function normalizeBoundedOptionalText(value: string | null | undefined, fieldName: string, maxLength: number) {
@@ -289,6 +399,120 @@ export const vehiclesRepo = {
     }
 
     return mapVehicleRecord(row);
+  },
+
+  async getInsightSummary(
+    id: string,
+    options: { monthCount?: number; recentTripLimit?: number } = {},
+  ): Promise<VehicleInsightSummary | null> {
+    const db = await getDatabase();
+    const vehicleRow = await getVehicleRowById(db, id);
+    if (!vehicleRow) {
+      return null;
+    }
+
+    const monthCount = clamp(options.monthCount ?? INSIGHT_MONTHS_DEFAULT, 3, 12);
+    const recentTripLimit = clamp(options.recentTripLimit ?? RECENT_TRIPS_LIMIT_DEFAULT, 1, 20);
+    const firstMonth = startOfMonthUtc(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - (monthCount - 1), 1)));
+
+    const [tripKpiRow, fuelKpiRow, monthlyRows, recentTripRows] = await Promise.all([
+      db.getFirstAsync<VehicleInsightKpiRow>(
+        `
+          SELECT
+            COUNT(1) AS total_trips,
+            COALESCE(SUM(distance_km), 0) AS total_distance_km,
+            COALESCE(SUM(CASE WHEN private_tag = 'business' THEN distance_km ELSE 0 END), 0) AS business_distance_km,
+            COALESCE(SUM(CASE WHEN private_tag = 'private' THEN distance_km ELSE 0 END), 0) AS private_distance_km,
+            COALESCE(SUM(CASE WHEN private_tag IS NULL THEN distance_km ELSE 0 END), 0) AS unclassified_distance_km,
+            0 AS fuel_spend_total,
+            NULL AS avg_consumption_l_per_100km
+          FROM trips
+          WHERE vehicle_id = ?
+            AND deleted_at IS NULL
+        `,
+        [id],
+      ),
+      db.getFirstAsync<{ fuel_spend_total: number; avg_consumption_l_per_100km: number | null }>(
+        `
+          SELECT
+            COALESCE(SUM(total_price), 0) AS fuel_spend_total,
+            AVG(avg_consumption_l_per_100km) AS avg_consumption_l_per_100km
+          FROM fuel_entries
+          WHERE vehicle_id = ?
+            AND deleted_at IS NULL
+        `,
+        [id],
+      ),
+      db.getAllAsync<VehicleMonthlyDistanceRow>(
+        `
+          SELECT
+            substr(occurred_at, 1, 7) AS month_key,
+            COALESCE(SUM(distance_km), 0) AS distance_km
+          FROM trips
+          WHERE vehicle_id = ?
+            AND deleted_at IS NULL
+            AND occurred_at >= ?
+          GROUP BY substr(occurred_at, 1, 7)
+          ORDER BY month_key ASC
+        `,
+        [id, firstMonth.toISOString()],
+      ),
+      db.getAllAsync<VehicleRecentTripRow>(
+        `
+          SELECT
+            id,
+            occurred_at,
+            purpose,
+            distance_km,
+            private_tag,
+            start_time,
+            end_time,
+            start_location,
+            end_location
+          FROM trips
+          WHERE vehicle_id = ?
+            AND deleted_at IS NULL
+          ORDER BY occurred_at DESC, created_at DESC
+          LIMIT ?
+        `,
+        [id, recentTripLimit],
+      ),
+    ]);
+
+    const baseKpis = tripKpiRow ?? {
+      total_trips: 0,
+      total_distance_km: 0,
+      business_distance_km: 0,
+      private_distance_km: 0,
+      unclassified_distance_km: 0,
+      fuel_spend_total: 0,
+      avg_consumption_l_per_100km: null,
+    };
+
+    const kpis: VehicleInsightSummary['kpis'] = {
+      totalTrips: baseKpis.total_trips,
+      totalDistanceKm: baseKpis.total_distance_km,
+      businessDistanceKm: baseKpis.business_distance_km,
+      privateDistanceKm: baseKpis.private_distance_km,
+      unclassifiedDistanceKm: baseKpis.unclassified_distance_km,
+      fuelSpendTotal: round2(fuelKpiRow?.fuel_spend_total ?? 0),
+      avgConsumptionLPer100Km:
+        typeof fuelKpiRow?.avg_consumption_l_per_100km === 'number'
+          ? round2(fuelKpiRow.avg_consumption_l_per_100km)
+          : null,
+    };
+
+    return {
+      vehicle: mapVehicleRecord(vehicleRow),
+      kpis,
+      monthlyDistance: buildMonthlyDistanceSeries(monthlyRows, monthCount),
+      usageSplit: buildUsageSplitPoints({
+        ...baseKpis,
+        fuel_spend_total: kpis.fuelSpendTotal,
+        avg_consumption_l_per_100km: kpis.avgConsumptionLPer100Km,
+      }),
+      recentTrips: recentTripRows.map(mapRecentTrip),
+    };
   },
 
   async create(input: VehicleWriteInput): Promise<VehicleRecord> {

@@ -4,7 +4,7 @@ import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { createId, nowIso } from '@/data/db-utils';
 import type { TripPrivateTag, TripRecord } from '@/data/types';
 
-import { assertValidPrivateTag, ensureValidTime, normalizeOptionalText, normalizeRequiredText } from './shared';
+import { assertRequiredPrivateTag, ensureValidTime, normalizeOptionalText, normalizeRequiredText } from './shared';
 
 const PURPOSE_MIN = 3;
 const PURPOSE_MAX = 100;
@@ -41,7 +41,7 @@ type TripCreateInput = {
   startLocation?: string | null;
   endLocation?: string | null;
   notes?: string | null;
-  privateTag?: TripPrivateTag;
+  privateTag: TripPrivateTag;
 };
 
 function mapTripRecord(row: TripRow): TripRecord {
@@ -234,7 +234,7 @@ function normalizeTripCreateInput(input: TripCreateInput) {
     startLocation: normalizeLocation(input.startLocation, 'Start location'),
     endLocation: normalizeLocation(input.endLocation, 'End location'),
     notes: normalizeTripNotes(input.notes),
-    privateTag: assertValidPrivateTag(input.privateTag),
+    privateTag: assertRequiredPrivateTag(input.privateTag),
   };
 }
 

@@ -197,7 +197,9 @@ export default function EntryDetailScreen() {
                     <ThemedText type="small" themeColor="textSecondary">
                       Tag
                     </ThemedText>
-                    <ThemedText type="smallBold">{entry.privateTag ?? 'none'}</ThemedText>
+                    <ThemedText type="smallBold">
+                      {entry.privateTag === null ? 'unclassified (legacy)' : entry.privateTag}
+                    </ThemedText>
                   </>
                 ) : (
                   <>

@@ -24,6 +24,7 @@ type TripFormErrors = {
   startOdometer?: string;
   endOdometer?: string;
   purpose?: string;
+  privateTag?: string;
   startTime?: string;
   endTime?: string;
   startLocation?: string;
@@ -72,6 +73,7 @@ export default function AddTripScreen() {
     startOdometer: false,
     endOdometer: false,
     purpose: false,
+    privateTag: false,
     startTime: false,
     endTime: false,
     startLocation: false,
@@ -232,6 +234,10 @@ export default function AddTripScreen() {
       result.purpose = `Purpose must be at most ${PURPOSE_MAX} characters.`;
     }
 
+    if (privateTag === null) {
+      result.privateTag = 'Trip classification is required (Business or Private).';
+    }
+
     if (startTime.trim().length > 0 && !isValidTime(startTime.trim())) {
       result.startTime = 'Start time must use HH:MM (24h).';
     }
@@ -259,13 +265,28 @@ export default function AddTripScreen() {
     }
 
     return result;
-  }, [endKmValue, endLocation, endOdometer, endTime, latestRecordedKm, notes, purpose, selectedVehicleId, startKmValue, startLocation, startOdometer, startTime]);
+  }, [
+    endKmValue,
+    endLocation,
+    endOdometer,
+    endTime,
+    latestRecordedKm,
+    notes,
+    privateTag,
+    purpose,
+    selectedVehicleId,
+    startKmValue,
+    startLocation,
+    startOdometer,
+    startTime,
+  ]);
 
   const isValid =
     !errors.vehicleId &&
     !errors.startOdometer &&
     !errors.endOdometer &&
     !errors.purpose &&
+    !errors.privateTag &&
     !errors.startTime &&
     !errors.endTime &&
     !errors.startLocation &&
@@ -286,6 +307,7 @@ export default function AddTripScreen() {
       startOdometer: true,
       endOdometer: true,
       purpose: true,
+      privateTag: true,
       startTime: true,
       endTime: true,
       startLocation: true,
@@ -541,16 +563,24 @@ export default function AddTripScreen() {
             </ThemedText>
           ) : null}
 
-          <ThemedText type="smallBold">Tag (optional)</ThemedText>
+          <ThemedText type="smallBold">Trip Classification</ThemedText>
           <View style={styles.tagRow}>
-            <Pressable onPress={() => setPrivateTag((current) => (current === 'business' ? null : 'business'))}>
+            <Pressable
+              onPress={() => {
+                setPrivateTag('business');
+                setTouched((prev) => ({ ...prev, privateTag: true }));
+              }}>
               <ThemedView
                 type={privateTag === 'business' ? 'backgroundSelected' : 'backgroundElement'}
                 style={styles.tagChip}>
                 <ThemedText type="small">Business</ThemedText>
               </ThemedView>
             </Pressable>
-            <Pressable onPress={() => setPrivateTag((current) => (current === 'private' ? null : 'private'))}>
+            <Pressable
+              onPress={() => {
+                setPrivateTag('private');
+                setTouched((prev) => ({ ...prev, privateTag: true }));
+              }}>
               <ThemedView
                 type={privateTag === 'private' ? 'backgroundSelected' : 'backgroundElement'}
                 style={styles.tagChip}>
@@ -558,6 +588,14 @@ export default function AddTripScreen() {
               </ThemedView>
             </Pressable>
           </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            Required for export filtering and clear work/private separation.
+          </ThemedText>
+          {showError('privateTag') ? (
+            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
+              {errors.privateTag}
+            </ThemedText>
+          ) : null}
 
           <ThemedText type="smallBold">Notes (optional)</ThemedText>
           <TextInput
