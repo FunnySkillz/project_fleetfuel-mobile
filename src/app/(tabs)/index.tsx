@@ -1,32 +1,26 @@
 import { useIsFocused } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Card, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, vehiclesRepo } from '@/data/repositories';
 
-type DashboardCardProps = {
+type DashboardMetricProps = {
   label: string;
   value: string;
   helper?: string;
 };
 
-function DashboardCard({ label, value, helper }: DashboardCardProps) {
+function DashboardMetric({ label, value, helper }: DashboardMetricProps) {
   return (
-    <ThemedView type="backgroundElement" style={styles.card}>
-      <ThemedText type="small" themeColor="textSecondary">
-        {label}
-      </ThemedText>
-      <ThemedText type="subtitle">{value}</ThemedText>
-      {helper ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          {helper}
-        </ThemedText>
-      ) : null}
-    </ThemedView>
+    <Card className="gap-1">
+      <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{label}</Text>
+      <Text className="text-2xl font-semibold text-text dark:text-dark-text">{value}</Text>
+      {helper ? <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{helper}</Text> : null}
+    </Card>
   );
 }
 
@@ -72,29 +66,26 @@ export default function DashboardScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.header}>
-            <ThemedText type="title" style={styles.title}>
-              Dashboard
-            </ThemedText>
-            <ThemedText themeColor="textSecondary">
-              Local-first overview. Drivers are deferred to post-MVP company platform.
-            </ThemedText>
-            {loadError ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                Metrics warning: {loadError}
-              </ThemedText>
-            ) : null}
-          </View>
+          <SectionHeader
+            title="Dashboard"
+            description="Local-first overview. Drivers are deferred to post-MVP company platform."
+          />
+
+          {loadError ? (
+            <Card tone="warning">
+              <Text className="text-xs text-warning dark:text-dark-warning">Metrics warning: {loadError}</Text>
+            </Card>
+          ) : null}
 
           <View style={styles.grid}>
-            <DashboardCard
+            <DashboardMetric
               label="Cars tracked"
               value={String(carsTracked)}
               helper={carsTracked === 0 ? 'Start by adding your first vehicle.' : undefined}
             />
-            <DashboardCard label="Drivers under you" value="0" helper="Deferred in MVP." />
-            <DashboardCard label="Trips this month" value={String(tripsThisMonth)} />
-            <DashboardCard label="Fuel entries this month" value={String(fuelThisMonth)} />
+            <DashboardMetric label="Drivers under you" value="0" helper="Deferred in MVP." />
+            <DashboardMetric label="Trips this month" value={String(tripsThisMonth)} />
+            <DashboardMetric label="Fuel entries this month" value={String(fuelThisMonth)} />
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -113,21 +104,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
     paddingBottom: Spacing.five,
-    gap: Spacing.four,
-  },
-  header: {
-    gap: Spacing.two,
-  },
-  title: {
-    fontSize: 36,
-    lineHeight: 42,
-  },
-  grid: {
     gap: Spacing.three,
   },
-  card: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.one,
+  grid: {
+    gap: Spacing.two,
   },
 });
+

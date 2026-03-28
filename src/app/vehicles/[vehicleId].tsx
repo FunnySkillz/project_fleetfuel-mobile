@@ -1,11 +1,11 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button, Card, EmptyState, ListRow, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
 import type { VehicleInsightSummary, VehicleUsageSplitPoint } from '@/data/types';
@@ -54,19 +54,11 @@ type KpiCardProps = {
 
 function KpiCard({ label, value, helper }: KpiCardProps) {
   return (
-    <ThemedView type="backgroundElement" style={styles.kpiCard}>
-      <ThemedText type="small" themeColor="textSecondary">
-        {label}
-      </ThemedText>
-      <ThemedText type="subtitle" style={styles.kpiValue}>
-        {value}
-      </ThemedText>
-      {helper ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          {helper}
-        </ThemedText>
-      ) : null}
-    </ThemedView>
+    <Card className="w-[48%] gap-1 p-3">
+      <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{label}</Text>
+      <Text className="text-xl font-semibold text-text dark:text-dark-text">{value}</Text>
+      {helper ? <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{helper}</Text> : null}
+    </Card>
   );
 }
 
@@ -167,53 +159,38 @@ export default function VehicleDetailScreen() {
         <ScrollView
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
           {status === 'loading' ? (
-            <ThemedView type="backgroundElement" style={styles.heroCard}>
+            <Card className="gap-2">
               <ActivityIndicator color={theme.textSecondary} />
-              <ThemedText type="small" themeColor="textSecondary">
-                Loading vehicle insight...
-              </ThemedText>
-            </ThemedView>
+              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Loading vehicle insight...</Text>
+            </Card>
           ) : status === 'error' || !summary ? (
-            <ThemedView type="backgroundElement" style={styles.heroCard}>
-              <ThemedText type="smallBold">Could not load vehicle insight</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {errorMessage ?? 'Unexpected error.'}
-              </ThemedText>
-              <Pressable onPress={() => void loadVehicleInsight()}>
-                <ThemedText type="link">Retry</ThemedText>
-              </Pressable>
-            </ThemedView>
+            <EmptyState
+              tone="destructive"
+              title="Could not load vehicle insight"
+              description={errorMessage ?? 'Unexpected error.'}
+              actionLabel="Retry"
+              onAction={() => void loadVehicleInsight()}
+            />
           ) : (
             <>
-              <ThemedView type="backgroundElement" style={styles.heroCard}>
-                <ThemedText type="subtitle">{summary.vehicle.name}</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {summary.vehicle.plate}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {summary.vehicle.make ?? '-'} {summary.vehicle.model ?? ''} {summary.vehicle.year ?? ''}
-                </ThemedText>
-              </ThemedView>
+              <SectionHeader
+                title={summary.vehicle.name}
+                description={`${summary.vehicle.plate} | ${summary.vehicle.make ?? '-'} ${summary.vehicle.model ?? ''} ${summary.vehicle.year ?? ''}`}
+              />
 
-              <ThemedView type="backgroundElement" style={styles.specsCard}>
-                <ThemedText type="smallBold">Vehicle Identity & Specs</ThemedText>
-                <View style={styles.specGrid}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    VIN / FIN: {summary.vehicle.vin ?? '-'}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Engine code: {summary.vehicle.engineTypeCode ?? '-'}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Power: {summary.vehicle.ps ?? '-'} PS / {summary.vehicle.kw ?? '-'} kW
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Displacement: {summary.vehicle.engineDisplacementCc ?? '-'} ccm
-                  </ThemedText>
-                </View>
-              </ThemedView>
+              <Card className="gap-1.5">
+                <Text className="text-sm font-semibold text-text dark:text-dark-text">Vehicle Identity & Specs</Text>
+                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">VIN / FIN: {summary.vehicle.vin ?? '-'}</Text>
+                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Engine code: {summary.vehicle.engineTypeCode ?? '-'}</Text>
+                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
+                  Power: {summary.vehicle.ps ?? '-'} PS / {summary.vehicle.kw ?? '-'} kW
+                </Text>
+                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
+                  Displacement: {summary.vehicle.engineDisplacementCc ?? '-'} ccm
+                </Text>
+              </Card>
 
               <View style={styles.kpiGrid}>
                 <KpiCard label="Total trips" value={String(summary.kpis.totalTrips)} />
@@ -231,16 +208,14 @@ export default function VehicleDetailScreen() {
                 />
               </View>
 
-              <ThemedView type="backgroundElement" style={styles.chartCard}>
-                <ThemedText type="smallBold">Monthly Distance (last 6 months)</ThemedText>
+              <Card className="gap-2">
+                <Text className="text-sm font-semibold text-text dark:text-dark-text">Monthly Distance (last 6 months)</Text>
                 <View style={styles.chartRows}>
                   {summary.monthlyDistance.map((point) => {
                     const widthPercent = Math.max(4, Math.round((point.distanceKm / monthlyMax) * 100));
                     return (
                       <View key={point.monthKey} style={styles.chartRow}>
-                        <ThemedText type="small" themeColor="textSecondary" style={styles.chartLabel}>
-                          {point.monthLabel}
-                        </ThemedText>
+                        <Text className="w-16 text-xs text-textSecondary dark:text-dark-textSecondary">{point.monthLabel}</Text>
                         <View style={[styles.chartTrack, { backgroundColor: theme.backgroundSelected }]}>
                           <View
                             style={[
@@ -252,25 +227,23 @@ export default function VehicleDetailScreen() {
                             ]}
                           />
                         </View>
-                        <ThemedText type="small" themeColor="textSecondary" style={styles.chartValue}>
+                        <Text className="w-20 text-right text-xs text-textSecondary dark:text-dark-textSecondary">
                           {point.distanceKm} km
-                        </ThemedText>
+                        </Text>
                       </View>
                     );
                   })}
                 </View>
-              </ThemedView>
+              </Card>
 
-              <ThemedView type="backgroundElement" style={styles.chartCard}>
-                <ThemedText type="smallBold">Work / Private Split</ThemedText>
+              <Card className="gap-2">
+                <Text className="text-sm font-semibold text-text dark:text-dark-text">Work / Private Split</Text>
                 <View style={styles.chartRows}>
                   {summary.usageSplit.map((item) => {
                     const widthPercent = Math.max(4, Math.round(item.ratio * 100));
                     return (
                       <View key={item.key} style={styles.chartRow}>
-                        <ThemedText type="small" themeColor="textSecondary" style={styles.chartLabel}>
-                          {item.label}
-                        </ThemedText>
+                        <Text className="w-16 text-xs text-textSecondary dark:text-dark-textSecondary">{item.label}</Text>
                         <View style={[styles.chartTrack, { backgroundColor: theme.backgroundSelected }]}>
                           <View
                             style={[
@@ -282,89 +255,68 @@ export default function VehicleDetailScreen() {
                             ]}
                           />
                         </View>
-                        <ThemedText type="small" themeColor="textSecondary" style={styles.chartValue}>
+                        <Text className="w-20 text-right text-xs text-textSecondary dark:text-dark-textSecondary">
                           {item.distanceKm} km
-                        </ThemedText>
+                        </Text>
                       </View>
                     );
                   })}
                 </View>
-              </ThemedView>
+              </Card>
 
-              <View style={styles.actions}>
-                <Pressable
+              <Card className="gap-2">
+                <Button
+                  label="Add Trip"
+                  variant="secondary"
                   onPress={() =>
                     router.push({
                       pathname: '/trips/new',
                       params: { vehicleId: summary.vehicle.id },
                     })
-                  }>
-                  <ThemedView type="backgroundElement" style={styles.actionCard}>
-                    <ThemedText type="smallBold">Add Trip</ThemedText>
-                  </ThemedView>
-                </Pressable>
-
-                <Pressable
+                  }
+                />
+                <Button
+                  label="Add Fuel Entry"
+                  variant="secondary"
                   onPress={() =>
                     router.push({
                       pathname: '/fuel/new',
                       params: { vehicleId: summary.vehicle.id },
                     })
-                  }>
-                  <ThemedView type="backgroundElement" style={styles.actionCard}>
-                    <ThemedText type="smallBold">Add Fuel Entry</ThemedText>
-                  </ThemedView>
-                </Pressable>
-              </View>
+                  }
+                />
+              </Card>
 
-              <ThemedView type="backgroundElement" style={styles.recentCard}>
-                <View style={styles.recentHeader}>
-                  <ThemedText type="smallBold">Recent Trips</ThemedText>
-                  <Pressable onPress={() => router.push('/logs')}>
-                    <ThemedText type="link">Open Logs</ThemedText>
-                  </Pressable>
-                </View>
+              <Card className="gap-2">
+                <SectionHeader title="Recent Trips" actionLabel="Open Logs" onAction={() => router.push('/logs')} />
 
                 {summary.recentTrips.length === 0 ? (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    No trips recorded for this vehicle yet.
-                  </ThemedText>
+                  <EmptyState title="No trips recorded" description="Add your first trip for this vehicle." />
                 ) : (
                   summary.recentTrips.map((trip) => (
-                    <Pressable
+                    <ListRow
                       key={trip.id}
+                      title={trip.purpose}
+                      subtitle={`${tripTagLabel(trip.privateTag)} | ${trip.distanceKm} km | ${trip.startLocation ?? 'N/A'} -> ${trip.endLocation ?? 'N/A'}`}
+                      meta={formatDate(trip.occurredAt)}
                       onPress={() =>
                         router.push({
                           pathname: '/entries/[entryId]',
                           params: { entryId: trip.id },
                         })
-                      }>
-                      <View style={styles.tripRow}>
-                        <View style={styles.tripRowLeft}>
-                          <ThemedText type="smallBold">{trip.purpose}</ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            {tripTagLabel(trip.privateTag)} • {trip.distanceKm} km
-                          </ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            {trip.startLocation ?? 'N/A'} {'->'} {trip.endLocation ?? 'N/A'}
-                          </ThemedText>
-                        </View>
-                        <ThemedText type="small" themeColor="textSecondary">
-                          {formatDate(trip.occurredAt)}
-                        </ThemedText>
-                      </View>
-                    </Pressable>
+                      }
+                    />
                   ))
                 )}
-              </ThemedView>
+              </Card>
 
-              <Pressable onPress={confirmDeleteVehicle} disabled={deleting} accessibilityState={{ disabled: deleting }}>
-                <ThemedView type="backgroundElement" style={[styles.deleteCard, deleting && styles.disabledAction]}>
-                  <ThemedText type="smallBold" style={{ color: theme.destructive }}>
-                    {deleting ? 'Deleting...' : 'Delete Vehicle'}
-                  </ThemedText>
-                </ThemedView>
-              </Pressable>
+              <Button
+                label={deleting ? 'Deleting...' : 'Delete Vehicle'}
+                variant="destructive"
+                loading={deleting}
+                disabled={deleting}
+                onPress={confirmDeleteVehicle}
+              />
             </>
           )}
         </ScrollView>
@@ -385,37 +337,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,
   },
-  heroCard: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.half,
-  },
-  specsCard: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
-  specGrid: {
-    gap: Spacing.half,
-  },
   kpiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  kpiCard: {
-    borderRadius: Spacing.three,
-    padding: Spacing.two,
-    gap: Spacing.half,
-    width: '48%',
-  },
-  kpiValue: {
-    fontSize: 24,
-    lineHeight: 30,
-  },
-  chartCard: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
     gap: Spacing.two,
   },
   chartRows: {
@@ -426,9 +350,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
   },
-  chartLabel: {
-    width: 62,
-  },
   chartTrack: {
     flex: 1,
     height: 10,
@@ -438,49 +359,6 @@ const styles = StyleSheet.create({
   chartBar: {
     height: '100%',
     borderRadius: Spacing.one,
-  },
-  chartValue: {
-    width: 78,
-    textAlign: 'right',
-  },
-  actions: {
-    gap: Spacing.two,
-  },
-  actionCard: {
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-  },
-  recentCard: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.two,
-  },
-  recentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  tripRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.one,
-  },
-  tripRowLeft: {
-    flex: 1,
-    gap: Spacing.half,
-  },
-  deleteCard: {
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    alignItems: 'center',
-  },
-  disabledAction: {
-    opacity: 0.45,
   },
 });
 

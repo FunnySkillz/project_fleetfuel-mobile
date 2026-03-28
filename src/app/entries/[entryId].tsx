@@ -1,11 +1,11 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button, Card, EmptyState, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo } from '@/data/repositories';
 import type { EntryDetail } from '@/data/types';
@@ -18,6 +18,24 @@ function formatDateTime(iso: string) {
   }
 
   return `${parsed.toISOString().slice(0, 10)} ${parsed.toISOString().slice(11, 16)} UTC`;
+}
+
+type DetailLineProps = {
+  label: string;
+  value: ReactNode;
+};
+
+function DetailLine({ label, value }: DetailLineProps) {
+  return (
+    <View className="gap-0.5">
+      <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{label}</Text>
+      {typeof value === 'string' ? (
+        <Text className="text-sm font-semibold text-text dark:text-dark-text">{value}</Text>
+      ) : (
+        value
+      )}
+    </View>
+  );
 }
 
 export default function EntryDetailScreen() {
@@ -117,159 +135,96 @@ export default function EntryDetailScreen() {
         <ScrollView
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
+          <SectionHeader title="Entry Detail" description={entry ? `Entry ID: ${entry.id}` : 'Loading selected entry.'} />
+
           {status === 'loading' ? (
-            <ThemedView type="backgroundElement" style={styles.card}>
+            <Card className="gap-2">
               <ActivityIndicator color={theme.textSecondary} />
-              <ThemedText type="small" themeColor="textSecondary">
-                Loading entry...
-              </ThemedText>
-            </ThemedView>
+              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Loading entry...</Text>
+            </Card>
           ) : status === 'error' || !entry ? (
-            <ThemedView type="backgroundElement" style={styles.card}>
-              <ThemedText type="smallBold">Could not load entry</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {errorMessage ?? 'Unexpected error.'}
-              </ThemedText>
-              <Pressable onPress={() => void loadEntry()}>
-                <ThemedText type="link">Retry</ThemedText>
-              </Pressable>
-            </ThemedView>
+            <EmptyState
+              tone="destructive"
+              title="Could not load entry"
+              description={errorMessage ?? 'Unexpected error.'}
+              actionLabel="Retry"
+              onAction={() => void loadEntry()}
+            />
           ) : (
             <>
-              <ThemedView type="backgroundElement" style={styles.card}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Entry ID
-                </ThemedText>
-                <ThemedText type="smallBold">{entry.id}</ThemedText>
-
-                <ThemedText type="small" themeColor="textSecondary">
-                  Type
-                </ThemedText>
-                <ThemedText type="smallBold">{entry.type === 'trip' ? 'Trip' : 'Fuel'}</ThemedText>
-
-                <ThemedText type="small" themeColor="textSecondary">
-                  Vehicle
-                </ThemedText>
-                <ThemedText type="smallBold">{entry.vehicleName}</ThemedText>
-
-                <ThemedText type="small" themeColor="textSecondary">
-                  Date
-                </ThemedText>
-                <ThemedText type="smallBold">{formatDateTime(entry.occurredAt)}</ThemedText>
+              <Card className="gap-2">
+                <DetailLine label="Type" value={entry.type === 'trip' ? 'Trip' : 'Fuel'} />
+                <DetailLine label="Vehicle" value={entry.vehicleName} />
+                <DetailLine label="Date" value={formatDateTime(entry.occurredAt)} />
 
                 {entry.type === 'trip' ? (
                   <>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Purpose
-                    </ThemedText>
-                    <ThemedText type="smallBold">{entry.purpose}</ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Start Km
-                    </ThemedText>
-                    <ThemedText type="smallBold">{entry.startOdometerKm}</ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Current Km
-                    </ThemedText>
-                    <ThemedText type="smallBold">{entry.endOdometerKm}</ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Distance
-                    </ThemedText>
-                    <ThemedText type="smallBold">{entry.distanceKm} km</ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Time
-                    </ThemedText>
-                    <ThemedText type="smallBold">
-                      {entry.startTime ?? '--:--'} - {entry.endTime ?? '--:--'}
-                    </ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Route
-                    </ThemedText>
-                    <ThemedText type="smallBold">
-                      {entry.startLocation ?? 'N/A'} {'->'} {entry.endLocation ?? 'N/A'}
-                    </ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Tag
-                    </ThemedText>
-                    <ThemedText type="smallBold">
-                      {entry.privateTag === null ? 'unclassified (legacy)' : entry.privateTag}
-                    </ThemedText>
+                    <DetailLine label="Purpose" value={entry.purpose} />
+                    <DetailLine label="Start Km" value={String(entry.startOdometerKm)} />
+                    <DetailLine label="Current Km" value={String(entry.endOdometerKm)} />
+                    <DetailLine label="Distance" value={`${entry.distanceKm} km`} />
+                    <DetailLine label="Time" value={`${entry.startTime ?? '--:--'} - ${entry.endTime ?? '--:--'}`} />
+                    <DetailLine label="Route" value={`${entry.startLocation ?? 'N/A'} -> ${entry.endLocation ?? 'N/A'}`} />
+                    <DetailLine
+                      label="Tag"
+                      value={entry.privateTag === null ? 'unclassified (legacy)' : entry.privateTag}
+                    />
                   </>
                 ) : (
                   <>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Liters
-                    </ThemedText>
-                    <ThemedText type="smallBold">{entry.liters.toFixed(2)} L</ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Total Price
-                    </ThemedText>
-                    <ThemedText type="smallBold">EUR {entry.totalPrice.toFixed(2)}</ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Station
-                    </ThemedText>
-                    <ThemedText type="smallBold">{entry.station}</ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Odometer
-                    </ThemedText>
-                    <ThemedText type="smallBold">{entry.odometerKm ?? 'N/A'}</ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Avg Consumption
-                    </ThemedText>
-                    <ThemedText type="smallBold">
-                      {entry.avgConsumptionLPer100Km !== null
-                        ? `${entry.avgConsumptionLPer100Km.toFixed(2)} L / 100 km`
-                        : 'Not enough data'}
-                    </ThemedText>
-
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Receipt
-                    </ThemedText>
-                    {entry.receiptUri ? (
-                      <Pressable onPress={() => void openReceipt()}>
-                        <ThemedText type="link">{entry.receiptName ?? 'Open receipt'}</ThemedText>
-                      </Pressable>
-                    ) : (
-                      <ThemedText type="smallBold">No receipt attached</ThemedText>
-                    )}
+                    <DetailLine label="Liters" value={`${entry.liters.toFixed(2)} L`} />
+                    <DetailLine label="Total Price" value={`EUR ${entry.totalPrice.toFixed(2)}`} />
+                    <DetailLine label="Station" value={entry.station} />
+                    <DetailLine label="Odometer" value={entry.odometerKm !== null ? String(entry.odometerKm) : 'N/A'} />
+                    <DetailLine
+                      label="Avg Consumption"
+                      value={
+                        entry.avgConsumptionLPer100Km !== null
+                          ? `${entry.avgConsumptionLPer100Km.toFixed(2)} L / 100 km`
+                          : 'Not enough data'
+                      }
+                    />
+                    <DetailLine
+                      label="Receipt"
+                      value={
+                        entry.receiptUri ? (
+                          <Button
+                            label={entry.receiptName ?? 'Open receipt'}
+                            variant="ghost"
+                            size="sm"
+                            className="self-start"
+                            onPress={() => void openReceipt()}
+                          />
+                        ) : (
+                          'No receipt attached'
+                        )
+                      }
+                    />
                   </>
                 )}
 
-                <ThemedText type="small" themeColor="textSecondary">
-                  Notes
-                </ThemedText>
-                <ThemedText>{entry.notes ?? 'No notes.'}</ThemedText>
-              </ThemedView>
+                <DetailLine label="Notes" value={entry.notes ?? 'No notes.'} />
+              </Card>
 
-              <Pressable
+              <Button
+                label="Edit Entry"
+                variant="secondary"
                 onPress={() =>
                   router.push({
                     pathname: '/entries/[entryId]/edit',
                     params: { entryId: entry.id },
                   })
-                }>
-                <ThemedView type="backgroundElement" style={styles.actionCard}>
-                  <ThemedText type="smallBold">Edit Entry</ThemedText>
-                </ThemedView>
-              </Pressable>
+                }
+              />
 
-              <Pressable onPress={confirmDelete} disabled={deleting} accessibilityState={{ disabled: deleting }}>
-                <ThemedView type="backgroundElement" style={[styles.actionCard, deleting && styles.disabledAction]}>
-                  <ThemedText type="smallBold" style={{ color: theme.destructive }}>
-                    {deleting ? 'Deleting...' : 'Delete Entry'}
-                  </ThemedText>
-                </ThemedView>
-              </Pressable>
+              <Button
+                label={deleting ? 'Deleting...' : 'Delete Entry'}
+                variant="destructive"
+                loading={deleting}
+                disabled={deleting}
+                onPress={confirmDelete}
+              />
             </>
           )}
         </ScrollView>
@@ -289,19 +244,5 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.four,
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,
-  },
-  card: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
-  actionCard: {
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    alignItems: 'center',
-  },
-  disabledAction: {
-    opacity: 0.45,
   },
 });

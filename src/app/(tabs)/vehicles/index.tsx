@@ -1,11 +1,11 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button, EmptyState, FormField, Input, ListRow, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
 import type { VehicleListItem } from '@/data/types';
@@ -70,45 +70,24 @@ export default function VehiclesScreen() {
   const listHeader = useMemo(
     () => (
       <View style={styles.headerSection}>
-        <View style={styles.header}>
-          <ThemedText type="title" style={styles.title}>
-            Vehicles
-          </ThemedText>
-          <ThemedText themeColor="textSecondary">Choose a vehicle to manage trips and fuel logs.</ThemedText>
-        </View>
+        <SectionHeader title="Vehicles" description="Choose a vehicle to manage trips and fuel logs." />
 
-        <Pressable onPress={() => router.push('/vehicles/new')} style={styles.primaryButton}>
-          <ThemedView type="backgroundElement" style={styles.primarySurface}>
-            <ThemedText type="smallBold">Add Vehicle</ThemedText>
-          </ThemedView>
-        </Pressable>
+        <Button label="Add Vehicle" variant="primary" onPress={() => router.push('/vehicles/new')} className="self-start" />
 
-        <View style={styles.searchSection}>
-          <TextInput
+        <FormField label="Search Vehicles" hint={`${vehicles.length} result${vehicles.length === 1 ? '' : 's'}`}>
+          <Input
             value={query}
             onChangeText={setQuery}
             placeholder="Search by name, plate, make, model, or VIN"
-            placeholderTextColor={theme.textSecondary}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
             clearButtonMode="while-editing"
-            style={[
-              styles.searchInput,
-              {
-                color: theme.text,
-                borderColor: theme.backgroundElement,
-                backgroundColor: theme.background,
-              },
-            ]}
           />
-          <ThemedText type="small" themeColor="textSecondary">
-            {vehicles.length} result{vehicles.length === 1 ? '' : 's'}
-          </ThemedText>
-        </View>
+        </FormField>
       </View>
     ),
-    [query, router, theme.background, theme.backgroundElement, theme.text, theme.textSecondary, vehicles.length],
+    [query, router, vehicles.length],
   );
 
   return (
@@ -122,64 +101,44 @@ export default function VehiclesScreen() {
           ListHeaderComponent={listHeader}
           ListEmptyComponent={
             status === 'loading' ? (
-              <ThemedView type="backgroundElement" style={styles.emptyState}>
+              <View style={styles.loadingWrap}>
                 <ActivityIndicator color={theme.textSecondary} />
-                <ThemedText type="small" themeColor="textSecondary">
-                  Loading vehicles...
-                </ThemedText>
-              </ThemedView>
+                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Loading vehicles...</Text>
+              </View>
             ) : status === 'error' ? (
-              <ThemedView type="backgroundElement" style={styles.emptyState}>
-                <ThemedText type="smallBold">Could not load vehicles</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {errorMessage ?? 'Unexpected error.'}
-                </ThemedText>
-                <Pressable onPress={() => void loadVehicles(query)}>
-                  <ThemedText type="link">Retry</ThemedText>
-                </Pressable>
-              </ThemedView>
+              <EmptyState
+                tone="destructive"
+                title="Could not load vehicles"
+                description={errorMessage ?? 'Unexpected error.'}
+                actionLabel="Retry"
+                onAction={() => void loadVehicles(query)}
+              />
             ) : (
-              <ThemedView type="backgroundElement" style={styles.emptyState}>
-                <ThemedText type="smallBold">{hasQuery ? 'No vehicles found' : 'No vehicles yet'}</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {hasQuery ? 'Try a broader search term.' : 'Create your first vehicle to begin logging trips and fuel.'}
-                </ThemedText>
-              </ThemedView>
+              <EmptyState
+                title={hasQuery ? 'No vehicles found' : 'No vehicles yet'}
+                description={
+                  hasQuery ? 'Try a broader search term.' : 'Create your first vehicle to begin logging trips and fuel.'
+                }
+              />
             )
           }
           renderItem={({ item: vehicle }) => (
-            <Pressable
+            <ListRow
+              title={vehicle.name}
+              subtitle={
+                vehicle.make || vehicle.model
+                  ? `${[vehicle.make, vehicle.model].filter(Boolean).join(' ')} | ${vehicle.plate} | Trips: ${vehicle.tripCount} | Fuel: ${vehicle.fuelCount}`
+                  : `${vehicle.plate} | Trips: ${vehicle.tripCount} | Fuel: ${vehicle.fuelCount}`
+              }
+              meta={formatDate(vehicle.lastActivityAt)}
               onPress={() =>
                 router.push({
                   pathname: '/vehicles/[vehicleId]',
                   params: { vehicleId: vehicle.id, name: vehicle.name, plate: vehicle.plate },
                 })
-              }>
-              <ThemedView type="backgroundElement" style={styles.row}>
-                <View style={styles.rowLeft}>
-                  <ThemedText type="smallBold">{vehicle.name}</ThemedText>
-                  {vehicle.make || vehicle.model ? (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {[vehicle.make, vehicle.model].filter(Boolean).join(' ')}
-                    </ThemedText>
-                  ) : null}
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {vehicle.plate}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Trips: {vehicle.tripCount} | Fuel: {vehicle.fuelCount}
-                  </ThemedText>
-                </View>
-                <View style={styles.rowRight}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {formatDate(vehicle.lastActivityAt)}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {'>'}
-                  </ThemedText>
-                </View>
-              </ThemedView>
-            </Pressable>
+              }
+              className="mt-2"
+            />
           )}
         />
       </SafeAreaView>
@@ -201,54 +160,14 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   headerSection: {
-    gap: Spacing.four,
+    gap: Spacing.three,
   },
-  header: {
-    gap: Spacing.two,
-  },
-  title: {
-    fontSize: 36,
-    lineHeight: 42,
-  },
-  primaryButton: {
-    alignSelf: 'flex-start',
-  },
-  primarySurface: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-  },
-  searchSection: {
-    gap: Spacing.one,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  row: {
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
+  loadingWrap: {
+    marginTop: Spacing.two,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: Spacing.two,
-    marginTop: Spacing.two,
-  },
-  rowLeft: {
-    flex: 1,
-    gap: Spacing.half,
-  },
-  rowRight: {
-    alignItems: 'flex-end',
-    gap: Spacing.half,
-  },
-  emptyState: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
     gap: Spacing.one,
-    marginTop: Spacing.two,
   },
 });
+
+

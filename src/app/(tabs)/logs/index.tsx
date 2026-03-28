@@ -518,7 +518,7 @@ export default function LogsScreen() {
                     <ListRow
                       key={entry.id}
                       title={entry.type === 'trip' ? 'Trip' : 'Fuel'}
-                      subtitle={`${entry.vehicleName} · ${entry.summary}`}
+                      subtitle={`${entry.vehicleName} | ${entry.summary}`}
                       meta={formatDate(entry.date)}
                       onPress={() =>
                         router.push({
@@ -579,3 +579,5 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
 });
+
+
