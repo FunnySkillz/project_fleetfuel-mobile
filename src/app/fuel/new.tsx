@@ -3,17 +3,22 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button, Card, EmptyState, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, fuelRepo, vehiclesRepo } from '@/data/repositories';
 import type { ReceiptAttachment, VehicleListItem } from '@/data/types';
-import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
-import { parseDecimalValue, parseIntegerValue, sanitizeDecimalInput, sanitizeIntegerInput, trimmedLength } from '@/utils/form-input';
+import {
+  parseDecimalValue,
+  parseIntegerValue,
+  sanitizeDecimalInput,
+  sanitizeIntegerInput,
+  trimmedLength,
+} from '@/utils/form-input';
 import { copyReceiptToAppStorage } from '@/utils/receipt-files';
 
 const LITERS_INTEGER_DIGITS = 3;
@@ -58,7 +63,6 @@ function calculateAvgConsumption(liters: number | null, odometerKm: number | nul
 export default function AddFuelEntryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ vehicleId?: string }>();
 
@@ -434,224 +438,175 @@ export default function AddFuelEntryScreen() {
         <ScrollView
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
-          <ThemedText type="smallBold">Vehicle</ThemedText>
-          {vehiclesLoading ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              Loading vehicles...
-            </ThemedText>
-          ) : hasVehicles ? (
-            <View style={styles.vehicleSelector}>
-              {vehicles.map((vehicle) => {
-                const active = selectedVehicleId === vehicle.id;
-                return (
-                  <Pressable
-                    key={vehicle.id}
-                    onPress={() => {
-                      setSelectedVehicleId(vehicle.id);
-                      setTouched((prev) => ({ ...prev, vehicleId: true }));
-                    }}>
-                    <ThemedView type={active ? 'backgroundSelected' : 'backgroundElement'} style={styles.vehicleChip}>
-                      <ThemedText type="smallBold">{vehicle.name}</ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {vehicle.plate}
-                      </ThemedText>
-                    </ThemedView>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <ThemedView type="backgroundElement" style={styles.noVehicleCard}>
-              <ThemedText type="smallBold">No vehicle available</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Add a vehicle first, then create fuel entries.
-              </ThemedText>
-              <Pressable onPress={() => router.push('/vehicles/new')}>
-                <ThemedText type="link">Add Vehicle</ThemedText>
-              </Pressable>
-            </ThemedView>
-          )}
-          {showError('vehicleId') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.vehicleId}
-            </ThemedText>
-          ) : null}
-
-          <ThemedText type="smallBold">Current Km (Tacho)</ThemedText>
-          <TextInput
-            value={odometer}
-            onChangeText={(value) => setOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
-            onBlur={() => setTouched((prev) => ({ ...prev, odometer: true }))}
-            keyboardType="numeric"
-            placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : '84210'}
-            placeholderTextColor={theme.textSecondary}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('odometer') && { borderColor: theme.destructive },
-            ]}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
+          <SectionHeader
+            title="Add Fuel Entry"
+            description="Track refuels with receipt evidence and local-first consumption preview."
           />
-          <ThemedText type="small" themeColor="textSecondary">
-            {latestRecordedKm !== null
-              ? `Latest recorded km: ${latestRecordedKm}`
-              : 'No previous odometer record found for this vehicle.'}
-          </ThemedText>
-          {showError('odometer') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.odometer}
-            </ThemedText>
-          ) : null}
 
-          <ThemedText type="smallBold">Liters</ThemedText>
-          <TextInput
-            value={liters}
-            onChangeText={(value) => setLiters(sanitizeDecimalInput(value, LITERS_INTEGER_DIGITS, LITERS_FRACTION_DIGITS))}
-            onBlur={() => setTouched((prev) => ({ ...prev, liters: true }))}
-            keyboardType="decimal-pad"
-            placeholder="42.4"
-            placeholderTextColor={theme.textSecondary}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('liters') && { borderColor: theme.destructive },
-            ]}
+          <Card className="gap-3">
+            <FormField
+              label="Vehicle"
+              required
+              error={showError('vehicleId') ? errors.vehicleId : null}
+              hint={hasVehicles ? undefined : 'Add a vehicle first, then create fuel entries.'}>
+              {vehiclesLoading ? (
+                <Input value="Loading vehicles..." editable={false} variant="subtle" />
+              ) : hasVehicles ? (
+                <SelectField
+                  options={vehicles.map((vehicle) => ({
+                    value: vehicle.id,
+                    label: `${vehicle.name} (${vehicle.plate})`,
+                  }))}
+                  value={selectedVehicleId || null}
+                  onChange={(value) => {
+                    setSelectedVehicleId(value);
+                    setTouched((prev) => ({ ...prev, vehicleId: true }));
+                  }}
+                />
+              ) : (
+                <EmptyState
+                  title="No vehicle available"
+                  description="Create your first vehicle to start recording fuel entries."
+                  actionLabel="Add Vehicle"
+                  onAction={() => router.push('/vehicles/new')}
+                />
+              )}
+            </FormField>
+
+            <FormField
+              label="Current Km (Tacho)"
+              required
+              hint={
+                latestRecordedKm !== null
+                  ? `Latest recorded km: ${latestRecordedKm}`
+                  : 'No previous odometer record found for this vehicle.'
+              }
+              error={showError('odometer') ? errors.odometer : null}>
+              <Input
+                value={odometer}
+                onChangeText={(value) => setOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
+                onBlur={() => setTouched((prev) => ({ ...prev, odometer: true }))}
+                keyboardType="number-pad"
+                placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : '84210'}
+                tone={showError('odometer') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+
+            <FormField label="Liters" required error={showError('liters') ? errors.liters : null}>
+              <Input
+                value={liters}
+                onChangeText={(value) => setLiters(sanitizeDecimalInput(value, LITERS_INTEGER_DIGITS, LITERS_FRACTION_DIGITS))}
+                onBlur={() => setTouched((prev) => ({ ...prev, liters: true }))}
+                keyboardType="decimal-pad"
+                placeholder="42.4"
+                tone={showError('liters') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+
+            <FormField label="Total Price" required error={showError('price') ? errors.price : null}>
+              <Input
+                value={price}
+                onChangeText={(value) => setPrice(sanitizeDecimalInput(value, PRICE_INTEGER_DIGITS, PRICE_FRACTION_DIGITS))}
+                onBlur={() => setTouched((prev) => ({ ...prev, price: true }))}
+                keyboardType="decimal-pad"
+                placeholder="72.10"
+                tone={showError('price') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+
+            <FormField
+              label="Station / Vendor"
+              required
+              hint={`${trimmedLength(station)}/${STATION_MAX}`}
+              error={showError('station') ? errors.station : null}>
+              <Input
+                value={station}
+                onChangeText={(value) => setStation(value.replace(/\n/g, ' ').slice(0, STATION_MAX))}
+                onBlur={() => setTouched((prev) => ({ ...prev, station: true }))}
+                placeholder="OMV City Center"
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={STATION_MAX}
+                tone={showError('station') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+
+            <FormField
+              label="Avg Consumption (readonly)"
+              hint={
+                previousFuelKm !== null
+                  ? `Based on previous fuel record at ${previousFuelKm} km.`
+                  : 'First fuel record for this vehicle, so no comparison baseline yet.'
+              }>
+              <Input
+                value={avgConsumptionPreview !== null ? `${avgConsumptionPreview.toFixed(2)} L / 100 km` : 'Need liters + previous fuel km'}
+                editable={false}
+                variant="subtle"
+              />
+            </FormField>
+
+            <FormField
+              label="Receipt / Evidence (optional)"
+              error={showError('receipt') ? errors.receipt : null}
+              hint="Take a photo, upload a photo, or attach a PDF receipt.">
+              <Card variant="subtle" className="gap-2">
+                <Button
+                  label="Take Photo"
+                  variant="secondary"
+                  size="sm"
+                  disabled={attachmentBusy}
+                  onPress={() => void attachFromCamera()}
+                />
+                <Button
+                  label="Upload Photo"
+                  variant="secondary"
+                  size="sm"
+                  disabled={attachmentBusy}
+                  onPress={() => void attachFromGallery()}
+                />
+                <Button
+                  label="Upload PDF"
+                  variant="secondary"
+                  size="sm"
+                  disabled={attachmentBusy}
+                  onPress={() => void attachPdf()}
+                />
+              </Card>
+
+              {receipt ? (
+                <Card variant="subtle" className="mt-2 gap-1.5">
+                  <Input value={receipt.name} editable={false} variant="ghost" />
+                  <Button label="Remove Receipt" variant="ghost" size="sm" onPress={() => setReceipt(null)} className="self-start" />
+                </Card>
+              ) : null}
+            </FormField>
+
+            <FormField
+              label="Notes (optional)"
+              hint={`${trimmedLength(notes)}/${NOTES_MAX}`}
+              error={showError('notes') ? errors.notes : null}>
+              <TextArea
+                value={notes}
+                onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
+                onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
+                placeholder="Receipt reference, route context, etc."
+                autoCapitalize="sentences"
+                maxLength={NOTES_MAX}
+                tone={showError('notes') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+          </Card>
+
+          <Button
+            label={attachmentBusy ? 'Preparing attachment...' : 'Save Fuel Entry'}
+            variant="primary"
+            loading={saving}
+            loadingLabel="Saving..."
+            disabled={!canSubmit}
+            onPress={() => void handleSave()}
           />
-          {showError('liters') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.liters}
-            </ThemedText>
-          ) : null}
-
-          <ThemedText type="smallBold">Total Price</ThemedText>
-          <TextInput
-            value={price}
-            onChangeText={(value) => setPrice(sanitizeDecimalInput(value, PRICE_INTEGER_DIGITS, PRICE_FRACTION_DIGITS))}
-            onBlur={() => setTouched((prev) => ({ ...prev, price: true }))}
-            keyboardType="decimal-pad"
-            placeholder="72.10"
-            placeholderTextColor={theme.textSecondary}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('price') && { borderColor: theme.destructive },
-            ]}
-          />
-          {showError('price') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.price}
-            </ThemedText>
-          ) : null}
-
-          <ThemedText type="smallBold">Station / Vendor</ThemedText>
-          <TextInput
-            value={station}
-            onChangeText={(value) => setStation(value.replace(/\n/g, ' ').slice(0, STATION_MAX))}
-            onBlur={() => setTouched((prev) => ({ ...prev, station: true }))}
-            placeholder="OMV City Center"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="words"
-            autoCorrect={false}
-            maxLength={STATION_MAX}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('station') && { borderColor: theme.destructive },
-            ]}
-          />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.counterText}>
-            {trimmedLength(station)}/{STATION_MAX}
-          </ThemedText>
-          {showError('station') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.station}
-            </ThemedText>
-          ) : null}
-
-          <ThemedText type="smallBold">Avg Consumption (readonly)</ThemedText>
-          <ThemedView type="backgroundElement" style={styles.readOnlyCard}>
-            <ThemedText type="subtitle">
-              {avgConsumptionPreview !== null ? `${avgConsumptionPreview.toFixed(2)} L / 100 km` : 'Need liters + previous fuel km'}
-            </ThemedText>
-            {previousFuelKm !== null ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                Based on previous fuel record at {previousFuelKm} km.
-              </ThemedText>
-            ) : (
-              <ThemedText type="small" themeColor="textSecondary">
-                First fuel record for this vehicle, so no comparison baseline yet.
-              </ThemedText>
-            )}
-          </ThemedView>
-
-          <ThemedText type="smallBold">Receipt / Evidence (optional)</ThemedText>
-          <View style={styles.attachmentButtons}>
-            <Pressable onPress={() => void attachFromCamera()} disabled={attachmentBusy}>
-              <ThemedView type="backgroundElement" style={styles.attachmentAction}>
-                <ThemedText type="small">Take Photo</ThemedText>
-              </ThemedView>
-            </Pressable>
-            <Pressable onPress={() => void attachFromGallery()} disabled={attachmentBusy}>
-              <ThemedView type="backgroundElement" style={styles.attachmentAction}>
-                <ThemedText type="small">Upload Photo</ThemedText>
-              </ThemedView>
-            </Pressable>
-            <Pressable onPress={() => void attachPdf()} disabled={attachmentBusy}>
-              <ThemedView type="backgroundElement" style={styles.attachmentAction}>
-                <ThemedText type="small">Upload PDF</ThemedText>
-              </ThemedView>
-            </Pressable>
-          </View>
-          {receipt ? (
-            <ThemedView type="backgroundElement" style={styles.receiptCard}>
-              <ThemedText type="smallBold">Attached:</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {receipt.name}
-              </ThemedText>
-              <Pressable onPress={() => setReceipt(null)}>
-                <ThemedText type="link">Remove receipt</ThemedText>
-              </Pressable>
-            </ThemedView>
-          ) : null}
-          {showError('receipt') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.receipt}
-            </ThemedText>
-          ) : null}
-
-          <ThemedText type="smallBold">Notes (optional)</ThemedText>
-          <TextInput
-            value={notes}
-            onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
-            onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
-            placeholder="Receipt reference, route context, etc."
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="sentences"
-            multiline
-            maxLength={NOTES_MAX}
-            style={[
-              styles.input,
-              styles.multiline,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('notes') && { borderColor: theme.destructive },
-            ]}
-          />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.counterText}>
-            {trimmedLength(notes)}/{NOTES_MAX}
-          </ThemedText>
-          {showError('notes') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.notes}
-            </ThemedText>
-          ) : null}
-
-          <Pressable onPress={() => void handleSave()} disabled={!canSubmit} accessibilityState={{ disabled: !canSubmit }}>
-            <ThemedView type="backgroundElement" style={[styles.primaryAction, !canSubmit && styles.primaryActionDisabled]}>
-              <ThemedText type="smallBold">
-                {saving ? 'Saving...' : attachmentBusy ? 'Preparing attachment...' : 'Save Fuel Entry'}
-              </ThemedText>
-            </ThemedView>
-          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -668,70 +623,6 @@ const styles = StyleSheet.create({
   content: {
     paddingTop: Spacing.four,
     paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
-  },
-  vehicleSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.one,
-  },
-  vehicleChip: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-    minWidth: 120,
-    gap: 2,
-  },
-  noVehicleCard: {
-    borderRadius: Spacing.two,
-    padding: Spacing.two,
-    gap: Spacing.one,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  readOnlyCard: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    gap: Spacing.half,
-  },
-  attachmentButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.one,
-  },
-  attachmentAction: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-  },
-  receiptCard: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.two,
-    gap: Spacing.half,
-  },
-  multiline: {
-    minHeight: 96,
-    textAlignVertical: 'top',
-  },
-  counterText: {
-    textAlign: 'right',
-    marginTop: -4,
-  },
-  errorText: {},
-  primaryAction: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    alignItems: 'center',
-    marginTop: Spacing.two,
-  },
-  primaryActionDisabled: {
-    opacity: 0.45,
+    gap: Spacing.three,
   },
 });

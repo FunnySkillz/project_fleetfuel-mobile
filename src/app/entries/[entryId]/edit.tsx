@@ -1,16 +1,14 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Button, Chip } from '@/components/ui';
+import { Button, Card, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo } from '@/data/repositories';
 import type { EntryDetail, TripPrivateTag } from '@/data/types';
-import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { trimmedLength } from '@/utils/form-input';
 
@@ -28,7 +26,6 @@ function normalizeNotes(value: string) {
 export default function EditEntryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ entryId?: string }>();
   const entryId = (params.entryId ?? '').trim();
@@ -153,96 +150,67 @@ export default function EditEntryScreen() {
         <ScrollView
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
+          <SectionHeader title="Edit Entry" description={entry ? `Editing entry: ${entry.id}` : 'Update editable fields only.'} />
+
           {status === 'loading' ? (
-            <ThemedView type="backgroundElement" style={styles.statusCard}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Loading entry...
-              </ThemedText>
-            </ThemedView>
+            <Card>
+              <Input value="Loading entry..." editable={false} variant="subtle" />
+            </Card>
           ) : status === 'error' || !entry ? (
-            <ThemedView type="backgroundElement" style={styles.statusCard}>
-              <ThemedText type="smallBold">Could not load entry</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {errorMessage ?? 'Unexpected error.'}
-              </ThemedText>
-              <Pressable onPress={() => void loadEntry()}>
-                <ThemedText type="link">Retry</ThemedText>
-              </Pressable>
-            </ThemedView>
+            <Card tone="destructive" className="gap-2">
+              <FormField label="Load Error" error={errorMessage ?? 'Unexpected error.'}>
+                <Input value="Could not load entry" editable={false} variant="subtle" tone="destructive" />
+              </FormField>
+              <Button label="Retry" variant="ghost" tone="destructive" onPress={() => void loadEntry()} className="self-start" />
+            </Card>
           ) : (
-            <>
-              <ThemedText type="small" themeColor="textSecondary">
-                Editing entry: {entry.id}
-              </ThemedText>
-
+            <Card className="gap-3">
               {entry.type === 'trip' ? (
-                <>
-                  <ThemedText type="smallBold">Private/Business Tag</ThemedText>
-                  {privateTag === null ? (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Legacy entry is unclassified. Select Business or Private before saving.
-                    </ThemedText>
-                  ) : null}
-                  <View style={styles.tagRow}>
-                    <Chip
-                      label="Business"
-                      active={privateTag === 'business'}
-                      onPress={() => {
-                        setPrivateTag('business');
-                        setTouched((prev) => ({ ...prev, privateTag: true }));
-                      }}
-                    />
-                    <Chip
-                      label="Private"
-                      active={privateTag === 'private'}
-                      onPress={() => {
-                        setPrivateTag('private');
-                        setTouched((prev) => ({ ...prev, privateTag: true }));
-                      }}
-                    />
-                  </View>
-                  {(submitAttempted || touched.privateTag) && errors.privateTag ? (
-                    <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-                      {errors.privateTag}
-                    </ThemedText>
-                  ) : null}
-                </>
+                <FormField
+                  label="Private/Business Tag"
+                  required
+                  hint={privateTag === null ? 'Legacy entry is unclassified. Select Business or Private before saving.' : undefined}
+                  error={(submitAttempted || touched.privateTag) ? errors.privateTag : null}>
+                  <SelectField
+                    options={[
+                      { value: 'business', label: 'Business' },
+                      { value: 'private', label: 'Private' },
+                    ]}
+                    value={privateTag}
+                    onChange={(value) => {
+                      setPrivateTag(value as Exclude<TripPrivateTag, null>);
+                      setTouched((prev) => ({ ...prev, privateTag: true }));
+                    }}
+                  />
+                </FormField>
               ) : null}
 
-              <ThemedText type="smallBold">Notes</ThemedText>
-              <TextInput
-                value={notes}
-                onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
-                onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
-                placeholder="Update notes"
-                placeholderTextColor={theme.textSecondary}
-                autoCapitalize="sentences"
-                multiline
-                style={[
-                  styles.input,
-                  styles.multiline,
-                  { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-                  showNotesError && { borderColor: theme.destructive },
-                ]}
-              />
-              <ThemedText type="small" themeColor="textSecondary" style={styles.counterText}>
-                {trimmedLength(notes)}/{NOTES_MAX}
-              </ThemedText>
-              {showNotesError ? (
-                <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-                  {errors.notes}
-                </ThemedText>
-              ) : null}
-
-              <Button
-                label={saving ? 'Saving...' : 'Save Changes'}
-                onPress={() => void handleSave()}
-                disabled={!canSubmit}
-                className={canSubmit ? 'mt-2' : 'mt-2 opacity-50'}
-              />
-            </>
+              <FormField
+                label="Notes"
+                hint={`${trimmedLength(notes)}/${NOTES_MAX}`}
+                error={showNotesError ? errors.notes : null}>
+                <TextArea
+                  value={notes}
+                  onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
+                  onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
+                  placeholder="Update notes"
+                  autoCapitalize="sentences"
+                  tone={showNotesError ? 'destructive' : 'neutral'}
+                />
+              </FormField>
+            </Card>
           )}
+
+          <Button
+            label="Save Changes"
+            variant="primary"
+            loading={saving}
+            loadingLabel="Saving..."
+            disabled={!canSubmit}
+            onPress={() => void handleSave()}
+          />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -259,31 +227,6 @@ const styles = StyleSheet.create({
   content: {
     paddingTop: Spacing.four,
     paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    gap: Spacing.three,
   },
-  statusCard: {
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
-  tagRow: {
-    flexDirection: 'row',
-    gap: Spacing.one,
-    flexWrap: 'wrap',
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  multiline: {
-    minHeight: 96,
-    textAlignVertical: 'top',
-  },
-  counterText: {
-    textAlign: 'right',
-    marginTop: -4,
-  },
-  errorText: {},
 });

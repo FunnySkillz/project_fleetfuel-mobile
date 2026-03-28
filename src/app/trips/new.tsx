@@ -1,16 +1,14 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Button, Chip } from '@/components/ui';
+import { Button, Card, DateTimeField, EmptyState, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, tripsRepo, vehiclesRepo } from '@/data/repositories';
 import type { TripPrivateTag, VehicleListItem } from '@/data/types';
-import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { parseIntegerValue, sanitizeIntegerInput, trimmedLength } from '@/utils/form-input';
 
@@ -48,7 +46,6 @@ function isValidTime(value: string) {
 export default function AddTripScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ vehicleId?: string }>();
 
@@ -192,7 +189,7 @@ export default function AddTripScreen() {
       notes.trim().length > 0 ||
       privateTag !== null ||
       saving,
-    [endLocation, endOdometer, notes, privateTag, purpose, saving, startLocation, startTime, endTime],
+    [endLocation, endOdometer, endTime, notes, privateTag, purpose, saving, startLocation, startTime],
   );
   const { allowNextNavigation } = useUnsavedChangesGuard(isDirty);
 
@@ -353,276 +350,193 @@ export default function AddTripScreen() {
         <ScrollView
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
-          <ThemedText type="smallBold">Vehicle</ThemedText>
-          {vehiclesLoading ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              Loading vehicles...
-            </ThemedText>
-          ) : hasVehicles ? (
-            <View style={styles.vehicleSelector}>
-              {vehicles.map((vehicle) => {
-                const active = selectedVehicleId === vehicle.id;
-                return (
-                  <Pressable
-                    key={vehicle.id}
-                    onPress={() => {
-                      setSelectedVehicleId(vehicle.id);
-                      setTouched((prev) => ({ ...prev, vehicleId: true }));
-                    }}>
-                    <ThemedView type={active ? 'backgroundSelected' : 'backgroundElement'} style={styles.vehicleChip}>
-                      <ThemedText type="smallBold">{vehicle.name}</ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {vehicle.plate}
-                      </ThemedText>
-                    </ThemedView>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <ThemedView type="backgroundElement" style={styles.noVehicleCard}>
-              <ThemedText type="smallBold">No vehicle available</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Add a vehicle first, then create trip entries.
-              </ThemedText>
-              <Pressable onPress={() => router.push('/vehicles/new')}>
-                <ThemedText type="link">Add Vehicle</ThemedText>
-              </Pressable>
-            </ThemedView>
-          )}
-          {showError('vehicleId') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.vehicleId}
-            </ThemedText>
-          ) : null}
-
-          <ThemedText type="smallBold">Start Km</ThemedText>
-          <TextInput
-            value={startOdometer}
-            onChangeText={(value) => setStartOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
-            onBlur={() => setTouched((prev) => ({ ...prev, startOdometer: true }))}
-            keyboardType="numeric"
-            editable={latestRecordedKm === null}
-            placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : '84000'}
-            placeholderTextColor={theme.textSecondary}
-            style={[
-              styles.input,
-              latestRecordedKm !== null && styles.readOnlyInput,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('startOdometer') && { borderColor: theme.destructive },
-            ]}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
+          <SectionHeader
+            title="Add Trip"
+            description="Capture odometer-safe trips with mandatory work/private classification for export accuracy."
           />
-          <ThemedText type="small" themeColor="textSecondary">
-            {latestRecordedKm !== null
-              ? `Suggested from latest record: ${latestRecordedKm} km`
-              : 'No previous odometer record found. Enter your start km manually.'}
-          </ThemedText>
-          {showError('startOdometer') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.startOdometer}
-            </ThemedText>
-          ) : null}
 
-          <ThemedText type="smallBold">Current Km (Tacho)</ThemedText>
-          <TextInput
-            value={endOdometer}
-            onChangeText={(value) => setEndOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
-            onBlur={() => setTouched((prev) => ({ ...prev, endOdometer: true }))}
-            keyboardType="numeric"
-            placeholder="84210"
-            placeholderTextColor={theme.textSecondary}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('endOdometer') && { borderColor: theme.destructive },
-            ]}
-          />
-          {showError('endOdometer') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.endOdometer}
-            </ThemedText>
-          ) : null}
+          <Card className="gap-3">
+            <FormField
+              label="Vehicle"
+              required
+              error={showError('vehicleId') ? errors.vehicleId : null}
+              hint={hasVehicles ? undefined : 'Add a vehicle first, then create trip entries.'}>
+              {vehiclesLoading ? (
+                <Input value="Loading vehicles..." editable={false} variant="subtle" />
+              ) : hasVehicles ? (
+                <SelectField
+                  options={vehicles.map((vehicle) => ({
+                    value: vehicle.id,
+                    label: `${vehicle.name} (${vehicle.plate})`,
+                  }))}
+                  value={selectedVehicleId || null}
+                  onChange={(value) => {
+                    setSelectedVehicleId(value);
+                    setTouched((prev) => ({ ...prev, vehicleId: true }));
+                  }}
+                />
+              ) : (
+                <EmptyState
+                  title="No vehicle available"
+                  description="Create your first vehicle to start recording trips."
+                  actionLabel="Add Vehicle"
+                  onAction={() => router.push('/vehicles/new')}
+                />
+              )}
+            </FormField>
 
-          <ThemedText type="smallBold">Distance (readonly)</ThemedText>
-          <ThemedView type="backgroundElement" style={styles.readOnlyCard}>
-            <ThemedText type="subtitle">{distanceKm !== null ? `${distanceKm} km` : 'Fill km values'}</ThemedText>
-          </ThemedView>
-
-          <ThemedText type="smallBold">Purpose</ThemedText>
-          <TextInput
-            value={purpose}
-            onChangeText={(value) => setPurpose(value.replace(/\n/g, ' ').slice(0, PURPOSE_MAX))}
-            onBlur={() => setTouched((prev) => ({ ...prev, purpose: true }))}
-            placeholder="Client meeting"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="sentences"
-            autoCorrect={false}
-            maxLength={PURPOSE_MAX}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('purpose') && { borderColor: theme.destructive },
-            ]}
-          />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.counterText}>
-            {trimmedLength(purpose)}/{PURPOSE_MAX}
-          </ThemedText>
-          {showError('purpose') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.purpose}
-            </ThemedText>
-          ) : null}
-
-          <View style={styles.rowTwoCols}>
-            <View style={styles.col}>
-              <ThemedText type="smallBold">Start Time (optional)</ThemedText>
-              <TextInput
-                value={startTime}
-                onChangeText={(value) => setStartTime(sanitizeTimeInput(value))}
-                onBlur={() => setTouched((prev) => ({ ...prev, startTime: true }))}
-                placeholder="08:30"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="numbers-and-punctuation"
-                style={[
-                  styles.input,
-                  { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-                  showError('startTime') && { borderColor: theme.destructive },
-                ]}
+            <FormField
+              label="Start Km"
+              required
+              hint={
+                latestRecordedKm !== null
+                  ? `Suggested from latest record: ${latestRecordedKm} km`
+                  : 'No previous odometer record found. Enter your start km manually.'
+              }
+              error={showError('startOdometer') ? errors.startOdometer : null}>
+              <Input
+                value={startOdometer}
+                onChangeText={(value) => setStartOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
+                onBlur={() => setTouched((prev) => ({ ...prev, startOdometer: true }))}
+                keyboardType="number-pad"
+                disabled={latestRecordedKm !== null}
+                placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : '84000'}
+                tone={showError('startOdometer') ? 'destructive' : 'neutral'}
               />
-              {showError('startTime') ? (
-                <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-                  {errors.startTime}
-                </ThemedText>
-              ) : null}
-            </View>
+            </FormField>
 
-            <View style={styles.col}>
-              <ThemedText type="smallBold">End Time (optional)</ThemedText>
-              <TextInput
-                value={endTime}
-                onChangeText={(value) => setEndTime(sanitizeTimeInput(value))}
-                onBlur={() => setTouched((prev) => ({ ...prev, endTime: true }))}
-                placeholder="09:10"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="numbers-and-punctuation"
-                style={[
-                  styles.input,
-                  { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-                  showError('endTime') && { borderColor: theme.destructive },
-                ]}
+            <FormField
+              label="Current Km (Tacho)"
+              required
+              error={showError('endOdometer') ? errors.endOdometer : null}>
+              <Input
+                value={endOdometer}
+                onChangeText={(value) => setEndOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
+                onBlur={() => setTouched((prev) => ({ ...prev, endOdometer: true }))}
+                keyboardType="number-pad"
+                placeholder="84210"
+                tone={showError('endOdometer') ? 'destructive' : 'neutral'}
               />
-              {showError('endTime') ? (
-                <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-                  {errors.endTime}
-                </ThemedText>
-              ) : null}
+            </FormField>
+
+            <FormField label="Distance (readonly)">
+              <Input value={distanceKm !== null ? `${distanceKm} km` : 'Fill km values'} editable={false} variant="subtle" />
+            </FormField>
+
+            <FormField
+              label="Purpose"
+              required
+              hint={`${trimmedLength(purpose)}/${PURPOSE_MAX}`}
+              error={showError('purpose') ? errors.purpose : null}>
+              <Input
+                value={purpose}
+                onChangeText={(value) => setPurpose(value.replace(/\n/g, ' ').slice(0, PURPOSE_MAX))}
+                onBlur={() => setTouched((prev) => ({ ...prev, purpose: true }))}
+                placeholder="Client meeting"
+                autoCapitalize="sentences"
+                autoCorrect={false}
+                maxLength={PURPOSE_MAX}
+                tone={showError('purpose') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+
+            <View style={styles.rowTwoCols}>
+              <View style={styles.col}>
+                <FormField label="Start Time (optional)" error={showError('startTime') ? errors.startTime : null}>
+                  <DateTimeField
+                    mode="time"
+                    value={startTime}
+                    onChangeText={(value) => setStartTime(sanitizeTimeInput(value))}
+                    onBlur={() => setTouched((prev) => ({ ...prev, startTime: true }))}
+                    placeholder="08:30"
+                    tone={showError('startTime') ? 'destructive' : 'neutral'}
+                  />
+                </FormField>
+              </View>
+
+              <View style={styles.col}>
+                <FormField label="End Time (optional)" error={showError('endTime') ? errors.endTime : null}>
+                  <DateTimeField
+                    mode="time"
+                    value={endTime}
+                    onChangeText={(value) => setEndTime(sanitizeTimeInput(value))}
+                    onBlur={() => setTouched((prev) => ({ ...prev, endTime: true }))}
+                    placeholder="09:10"
+                    tone={showError('endTime') ? 'destructive' : 'neutral'}
+                  />
+                </FormField>
+              </View>
             </View>
-          </View>
 
-          <ThemedText type="smallBold">Start Location (optional)</ThemedText>
-          <TextInput
-            value={startLocation}
-            onChangeText={(value) => setStartLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX))}
-            onBlur={() => setTouched((prev) => ({ ...prev, startLocation: true }))}
-            placeholder="Vienna Office"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="words"
-            autoCorrect={false}
-            maxLength={LOCATION_MAX}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('startLocation') && { borderColor: theme.destructive },
-            ]}
-          />
-          {showError('startLocation') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.startLocation}
-            </ThemedText>
-          ) : null}
+            <FormField label="Start Location (optional)" error={showError('startLocation') ? errors.startLocation : null}>
+              <Input
+                value={startLocation}
+                onChangeText={(value) => setStartLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX))}
+                onBlur={() => setTouched((prev) => ({ ...prev, startLocation: true }))}
+                placeholder="Vienna Office"
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={LOCATION_MAX}
+                tone={showError('startLocation') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
 
-          <ThemedText type="smallBold">End Location (optional)</ThemedText>
-          <TextInput
-            value={endLocation}
-            onChangeText={(value) => setEndLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX))}
-            onBlur={() => setTouched((prev) => ({ ...prev, endLocation: true }))}
-            placeholder="Client HQ"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="words"
-            autoCorrect={false}
-            maxLength={LOCATION_MAX}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('endLocation') && { borderColor: theme.destructive },
-            ]}
-          />
-          {showError('endLocation') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.endLocation}
-            </ThemedText>
-          ) : null}
+            <FormField label="End Location (optional)" error={showError('endLocation') ? errors.endLocation : null}>
+              <Input
+                value={endLocation}
+                onChangeText={(value) => setEndLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX))}
+                onBlur={() => setTouched((prev) => ({ ...prev, endLocation: true }))}
+                placeholder="Client HQ"
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={LOCATION_MAX}
+                tone={showError('endLocation') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
 
-          <ThemedText type="smallBold">Trip Classification</ThemedText>
-          <View style={styles.tagRow}>
-            <Chip
-              label="Business"
-              active={privateTag === 'business'}
-              onPress={() => {
-                setPrivateTag('business');
-                setTouched((prev) => ({ ...prev, privateTag: true }));
-              }}
-            />
-            <Chip
-              label="Private"
-              active={privateTag === 'private'}
-              onPress={() => {
-                setPrivateTag('private');
-                setTouched((prev) => ({ ...prev, privateTag: true }));
-              }}
-            />
-          </View>
-          <ThemedText type="small" themeColor="textSecondary">
-            Required for export filtering and clear work/private separation.
-          </ThemedText>
-          {showError('privateTag') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.privateTag}
-            </ThemedText>
-          ) : null}
+            <FormField
+              label="Trip Classification"
+              required
+              hint="Required for export filtering and clear work/private separation."
+              error={showError('privateTag') ? errors.privateTag : null}>
+              <SelectField
+                options={[
+                  { value: 'business', label: 'Business' },
+                  { value: 'private', label: 'Private' },
+                ]}
+                value={privateTag}
+                onChange={(value) => {
+                  setPrivateTag(value as Exclude<TripPrivateTag, null>);
+                  setTouched((prev) => ({ ...prev, privateTag: true }));
+                }}
+              />
+            </FormField>
 
-          <ThemedText type="smallBold">Notes (optional)</ThemedText>
-          <TextInput
-            value={notes}
-            onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
-            onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
-            placeholder="Parking and toll included"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="sentences"
-            multiline
-            maxLength={NOTES_MAX}
-            style={[
-              styles.input,
-              styles.multiline,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('notes') && { borderColor: theme.destructive },
-            ]}
-          />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.counterText}>
-            {trimmedLength(notes)}/{NOTES_MAX}
-          </ThemedText>
-          {showError('notes') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.notes}
-            </ThemedText>
-          ) : null}
+            <FormField
+              label="Notes (optional)"
+              hint={`${trimmedLength(notes)}/${NOTES_MAX}`}
+              error={showError('notes') ? errors.notes : null}>
+              <TextArea
+                value={notes}
+                onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
+                onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
+                placeholder="Parking and toll included"
+                autoCapitalize="sentences"
+                maxLength={NOTES_MAX}
+                tone={showError('notes') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+          </Card>
 
           <Button
-            label={saving ? 'Saving...' : 'Save Trip'}
-            onPress={() => void handleSave()}
+            label="Save Trip"
+            loading={saving}
+            loadingLabel="Saving..."
+            variant="primary"
             disabled={!canSubmit}
-            className={canSubmit ? 'mt-2' : 'mt-2 opacity-50'}
+            onPress={() => void handleSave()}
           />
         </ScrollView>
       </SafeAreaView>
@@ -640,38 +554,7 @@ const styles = StyleSheet.create({
   content: {
     paddingTop: Spacing.four,
     paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
-  },
-  vehicleSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.one,
-  },
-  vehicleChip: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-    minWidth: 120,
-    gap: 2,
-  },
-  noVehicleCard: {
-    borderRadius: Spacing.two,
-    padding: Spacing.two,
-    gap: Spacing.one,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  readOnlyInput: {
-    opacity: 0.8,
-  },
-  readOnlyCard: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    gap: Spacing.three,
   },
   rowTwoCols: {
     flexDirection: 'row',
@@ -679,20 +562,5 @@ const styles = StyleSheet.create({
   },
   col: {
     flex: 1,
-    gap: Spacing.one,
   },
-  multiline: {
-    minHeight: 96,
-    textAlignVertical: 'top',
-  },
-  tagRow: {
-    flexDirection: 'row',
-    gap: Spacing.one,
-    flexWrap: 'wrap',
-  },
-  counterText: {
-    textAlign: 'right',
-    marginTop: -4,
-  },
-  errorText: {},
 });

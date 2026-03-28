@@ -1,15 +1,14 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button, Card, FormField, Input, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
-import { parseIntegerValue, sanitizeIntegerInput, sanitizePlateInput, trimmedLength } from '@/utils/form-input';
-import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import { parseIntegerValue, sanitizeIntegerInput, sanitizePlateInput, trimmedLength } from '@/utils/form-input';
 
 const VEHICLE_NAME_MIN = 2;
 const VEHICLE_NAME_MAX = 60;
@@ -40,7 +39,6 @@ function sanitizeVinInput(value: string) {
 export default function AddVehicleScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
 
   const [name, setName] = useState('');
   const [plate, setPlate] = useState('');
@@ -211,225 +209,158 @@ export default function AddVehicleScreen() {
         <ScrollView
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
-          <ThemedText type="smallBold">Vehicle Name</ThemedText>
-          <TextInput
-            value={name}
-            onChangeText={(value) => setName(value.replace(/\n/g, ' ').slice(0, VEHICLE_NAME_MAX))}
-            onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
-            placeholder="Ford Transit"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="words"
-            autoCorrect={false}
-            maxLength={VEHICLE_NAME_MAX}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('name') && { borderColor: theme.destructive },
-            ]}
-          />
-          <View style={styles.metaRow}>
-            <ThemedText type="small" themeColor="textSecondary">
-              {trimmedLength(name)}/{VEHICLE_NAME_MAX}
-            </ThemedText>
-            {showError('name') ? (
-              <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-                {errors.name}
-              </ThemedText>
-            ) : null}
-          </View>
-
-          <ThemedText type="smallBold">License Plate</ThemedText>
-          <TextInput
-            value={plate}
-            onChangeText={(value) => setPlate(sanitizePlateInput(value, LICENSE_PLATE_MAX))}
-            onBlur={() => setTouched((prev) => ({ ...prev, plate: true }))}
-            placeholder="W-123AB"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={LICENSE_PLATE_MAX}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('plate') && { borderColor: theme.destructive },
-            ]}
-          />
-          <View style={styles.metaRow}>
-            <ThemedText type="small" themeColor="textSecondary">
-              {trimmedLength(plate)}/{LICENSE_PLATE_MAX}
-            </ThemedText>
-            {showError('plate') ? (
-              <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-                {errors.plate}
-              </ThemedText>
-            ) : null}
-          </View>
-
-          <ThemedText type="smallBold">Make (optional)</ThemedText>
-          <TextInput
-            value={make}
-            onChangeText={(value) => setMake(value.replace(/\n/g, ' ').slice(0, TEXT_MAX))}
-            placeholder="Ford"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="words"
-            autoCorrect={false}
-            maxLength={TEXT_MAX}
-            style={[styles.input, { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background }]}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
+          <SectionHeader
+            title="Add Vehicle"
+            description="Store complete vehicle identity and technical details for local-first tracking."
           />
 
-          <ThemedText type="smallBold">Model (optional)</ThemedText>
-          <TextInput
-            value={model}
-            onChangeText={(value) => setModel(value.replace(/\n/g, ' ').slice(0, TEXT_MAX))}
-            placeholder="Transit Custom"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="words"
-            autoCorrect={false}
-            maxLength={TEXT_MAX}
-            style={[styles.input, { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background }]}
-          />
-
-          <ThemedText type="smallBold">Year (optional)</ThemedText>
-          <TextInput
-            value={year}
-            onChangeText={(value) => setYear(sanitizeIntegerInput(value, 4))}
-            onBlur={() => setTouched((prev) => ({ ...prev, year: true }))}
-            keyboardType="numeric"
-            placeholder="2022"
-            placeholderTextColor={theme.textSecondary}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('year') && { borderColor: theme.destructive },
-            ]}
-          />
-          {showError('year') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.year}
-            </ThemedText>
-          ) : null}
-
-          <View style={styles.rowTwoCols}>
-            <View style={styles.col}>
-              <ThemedText type="smallBold">PS (optional)</ThemedText>
-              <TextInput
-                value={ps}
-                onChangeText={(value) => setPs(sanitizeIntegerInput(value, 4))}
-                onBlur={() => setTouched((prev) => ({ ...prev, ps: true }))}
-                keyboardType="numeric"
-                placeholder="150"
-                placeholderTextColor={theme.textSecondary}
-                style={[
-                  styles.input,
-                  { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-                  showError('ps') && { borderColor: theme.destructive },
-                ]}
+          <Card className="gap-3">
+            <FormField
+              label="Vehicle Name"
+              required
+              hint={`${trimmedLength(name)}/${VEHICLE_NAME_MAX}`}
+              error={showError('name') ? errors.name : null}>
+              <Input
+                value={name}
+                onChangeText={(value) => setName(value.replace(/\n/g, ' ').slice(0, VEHICLE_NAME_MAX))}
+                onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
+                placeholder="Ford Transit"
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={VEHICLE_NAME_MAX}
+                tone={showError('name') ? 'destructive' : 'neutral'}
               />
-              {showError('ps') ? (
-                <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-                  {errors.ps}
-                </ThemedText>
-              ) : null}
+            </FormField>
+
+            <FormField
+              label="License Plate"
+              required
+              hint={`${trimmedLength(plate)}/${LICENSE_PLATE_MAX}`}
+              error={showError('plate') ? errors.plate : null}>
+              <Input
+                value={plate}
+                onChangeText={(value) => setPlate(sanitizePlateInput(value, LICENSE_PLATE_MAX))}
+                onBlur={() => setTouched((prev) => ({ ...prev, plate: true }))}
+                placeholder="W-123AB"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={LICENSE_PLATE_MAX}
+                tone={showError('plate') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+
+            <FormField label="Make (optional)">
+              <Input
+                value={make}
+                onChangeText={(value) => setMake(value.replace(/\n/g, ' ').slice(0, TEXT_MAX))}
+                placeholder="Ford"
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={TEXT_MAX}
+              />
+            </FormField>
+
+            <FormField label="Model (optional)">
+              <Input
+                value={model}
+                onChangeText={(value) => setModel(value.replace(/\n/g, ' ').slice(0, TEXT_MAX))}
+                placeholder="Transit Custom"
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={TEXT_MAX}
+              />
+            </FormField>
+
+            <FormField label="Year (optional)" error={showError('year') ? errors.year : null}>
+              <Input
+                value={year}
+                onChangeText={(value) => setYear(sanitizeIntegerInput(value, 4))}
+                onBlur={() => setTouched((prev) => ({ ...prev, year: true }))}
+                keyboardType="number-pad"
+                placeholder="2022"
+                tone={showError('year') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+
+            <View style={styles.rowTwoCols}>
+              <View style={styles.col}>
+                <FormField label="PS (optional)" error={showError('ps') ? errors.ps : null}>
+                  <Input
+                    value={ps}
+                    onChangeText={(value) => setPs(sanitizeIntegerInput(value, 4))}
+                    onBlur={() => setTouched((prev) => ({ ...prev, ps: true }))}
+                    keyboardType="number-pad"
+                    placeholder="150"
+                    tone={showError('ps') ? 'destructive' : 'neutral'}
+                  />
+                </FormField>
+              </View>
+
+              <View style={styles.col}>
+                <FormField label="kW (optional)" error={showError('kw') ? errors.kw : null}>
+                  <Input
+                    value={kw}
+                    onChangeText={(value) => setKw(sanitizeIntegerInput(value, 4))}
+                    onBlur={() => setTouched((prev) => ({ ...prev, kw: true }))}
+                    keyboardType="number-pad"
+                    placeholder="110"
+                    tone={showError('kw') ? 'destructive' : 'neutral'}
+                  />
+                </FormField>
+              </View>
             </View>
 
-            <View style={styles.col}>
-              <ThemedText type="smallBold">kW (optional)</ThemedText>
-              <TextInput
-                value={kw}
-                onChangeText={(value) => setKw(sanitizeIntegerInput(value, 4))}
-                onBlur={() => setTouched((prev) => ({ ...prev, kw: true }))}
-                keyboardType="numeric"
-                placeholder="110"
-                placeholderTextColor={theme.textSecondary}
-                style={[
-                  styles.input,
-                  { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-                  showError('kw') && { borderColor: theme.destructive },
-                ]}
+            <FormField label="Hubraum ccm (optional)" error={showError('engineDisplacementCc') ? errors.engineDisplacementCc : null}>
+              <Input
+                value={engineDisplacementCc}
+                onChangeText={(value) => setEngineDisplacementCc(sanitizeIntegerInput(value, 5))}
+                onBlur={() => setTouched((prev) => ({ ...prev, engineDisplacementCc: true }))}
+                keyboardType="number-pad"
+                placeholder="1995"
+                tone={showError('engineDisplacementCc') ? 'destructive' : 'neutral'}
               />
-              {showError('kw') ? (
-                <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-                  {errors.kw}
-                </ThemedText>
-              ) : null}
-            </View>
-          </View>
+            </FormField>
 
-          <ThemedText type="smallBold">Hubraum ccm (optional)</ThemedText>
-          <TextInput
-            value={engineDisplacementCc}
-            onChangeText={(value) => setEngineDisplacementCc(sanitizeIntegerInput(value, 5))}
-            onBlur={() => setTouched((prev) => ({ ...prev, engineDisplacementCc: true }))}
-            keyboardType="numeric"
-            placeholder="1995"
-            placeholderTextColor={theme.textSecondary}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('engineDisplacementCc') && { borderColor: theme.destructive },
-            ]}
+            <FormField label="VIN / FIN (optional)" error={showError('vin') ? errors.vin : null}>
+              <Input
+                value={vin}
+                onChangeText={(value) => setVin(sanitizeVinInput(value))}
+                onBlur={() => setTouched((prev) => ({ ...prev, vin: true }))}
+                placeholder="WF0XXXXXXXXXXXXXX"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={17}
+                tone={showError('vin') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+
+            <FormField
+              label="Engine Type Code (optional)"
+              hint={`${trimmedLength(engineTypeCode)}/${ENGINE_CODE_MAX}`}
+              error={showError('engineTypeCode') ? errors.engineTypeCode : null}>
+              <Input
+                value={engineTypeCode}
+                onChangeText={(value) => setEngineTypeCode(value.replace(/\n/g, ' ').slice(0, ENGINE_CODE_MAX))}
+                onBlur={() => setTouched((prev) => ({ ...prev, engineTypeCode: true }))}
+                placeholder="YT2Q"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={ENGINE_CODE_MAX}
+                tone={showError('engineTypeCode') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+          </Card>
+
+          <Button
+            label="Save Vehicle"
+            loading={saving}
+            loadingLabel="Saving..."
+            variant="primary"
+            disabled={!canSubmit}
+            onPress={() => void handleSave()}
           />
-          {showError('engineDisplacementCc') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.engineDisplacementCc}
-            </ThemedText>
-          ) : null}
-
-          <ThemedText type="smallBold">VIN / FIN (optional)</ThemedText>
-          <TextInput
-            value={vin}
-            onChangeText={(value) => setVin(sanitizeVinInput(value))}
-            onBlur={() => setTouched((prev) => ({ ...prev, vin: true }))}
-            placeholder="WF0XXXXXXXXXXXXXX"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={17}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('vin') && { borderColor: theme.destructive },
-            ]}
-          />
-          {showError('vin') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.vin}
-            </ThemedText>
-          ) : null}
-
-          <ThemedText type="smallBold">Engine Type Code (optional)</ThemedText>
-          <TextInput
-            value={engineTypeCode}
-            onChangeText={(value) => setEngineTypeCode(value.replace(/\n/g, ' ').slice(0, ENGINE_CODE_MAX))}
-            onBlur={() => setTouched((prev) => ({ ...prev, engineTypeCode: true }))}
-            placeholder="YT2Q"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={ENGINE_CODE_MAX}
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement, backgroundColor: theme.background },
-              showError('engineTypeCode') && { borderColor: theme.destructive },
-            ]}
-          />
-          {showError('engineTypeCode') ? (
-            <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
-              {errors.engineTypeCode}
-            </ThemedText>
-          ) : null}
-
-          <View style={styles.actions}>
-            <Pressable
-              onPress={() => void handleSave()}
-              disabled={!canSubmit}
-              accessibilityState={{ disabled: !canSubmit }}>
-              <ThemedView type="backgroundElement" style={[styles.primaryAction, !canSubmit && styles.primaryActionDisabled]}>
-                <ThemedText type="smallBold">{saving ? 'Saving...' : 'Save Vehicle'}</ThemedText>
-              </ThemedView>
-            </Pressable>
-          </View>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -446,19 +377,7 @@ const styles = StyleSheet.create({
   content: {
     paddingTop: Spacing.four,
     paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.one,
+    gap: Spacing.three,
   },
   rowTwoCols: {
     flexDirection: 'row',
@@ -466,21 +385,5 @@ const styles = StyleSheet.create({
   },
   col: {
     flex: 1,
-    gap: Spacing.one,
-  },
-  errorText: {
-    flexShrink: 1,
-  },
-  actions: {
-    paddingTop: Spacing.two,
-  },
-  primaryAction: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    alignItems: 'center',
-  },
-  primaryActionDisabled: {
-    opacity: 0.45,
   },
 });
