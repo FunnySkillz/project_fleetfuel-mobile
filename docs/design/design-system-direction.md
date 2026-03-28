@@ -110,6 +110,12 @@ State colors and messaging must be consistent across all screens.
 - No hardcoded colors; tokens only.
 - No one-off component variants without documented reason.
 
+## Implementation Governance
+
+- Follow the primitive-first implementation contract in [UI Governance](./ui-governance.md).
+- Add or change behavior in `src/components/ui` first, then consume in screens.
+- New screens must pass the migration checklist from the governance doc before merge.
+
 ## FleetFuel-Specific Visual Notes
 
 - Vehicle cards:
@@ -126,4 +132,3 @@ State colors and messaging must be consistent across all screens.
 ## What FleetFuel Should Feel Like
 
 FleetFuel should feel like a dependable financial logbook on mobile: calm, precise, and trustworthy, with zero ambiguity about data, actions, and evidence.
-
