@@ -12,6 +12,8 @@ module.exports = {
         text: '#000000',
         textSecondary: '#60646C',
         accent: '#2D6CF6',
+        success: '#217A3E',
+        warning: '#A26600',
         destructive: '#C53B3B',
         dark: {
           background: '#000000',
@@ -20,6 +22,8 @@ module.exports = {
           text: '#ffffff',
           textSecondary: '#B0B4BA',
           accent: '#7FA7FF',
+          success: '#4FD58A',
+          warning: '#FFB54D',
           destructive: '#FF7A7A',
         },
       },
@@ -31,4 +35,3 @@ module.exports = {
   },
   plugins: [],
 };
-
