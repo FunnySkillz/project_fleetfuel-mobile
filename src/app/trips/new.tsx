@@ -6,6 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button, Chip } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, tripsRepo, vehiclesRepo } from '@/data/repositories';
 import type { TripPrivateTag, VehicleListItem } from '@/data/types';
@@ -565,28 +566,22 @@ export default function AddTripScreen() {
 
           <ThemedText type="smallBold">Trip Classification</ThemedText>
           <View style={styles.tagRow}>
-            <Pressable
+            <Chip
+              label="Business"
+              active={privateTag === 'business'}
               onPress={() => {
                 setPrivateTag('business');
                 setTouched((prev) => ({ ...prev, privateTag: true }));
-              }}>
-              <ThemedView
-                type={privateTag === 'business' ? 'backgroundSelected' : 'backgroundElement'}
-                style={styles.tagChip}>
-                <ThemedText type="small">Business</ThemedText>
-              </ThemedView>
-            </Pressable>
-            <Pressable
+              }}
+            />
+            <Chip
+              label="Private"
+              active={privateTag === 'private'}
               onPress={() => {
                 setPrivateTag('private');
                 setTouched((prev) => ({ ...prev, privateTag: true }));
-              }}>
-              <ThemedView
-                type={privateTag === 'private' ? 'backgroundSelected' : 'backgroundElement'}
-                style={styles.tagChip}>
-                <ThemedText type="small">Private</ThemedText>
-              </ThemedView>
-            </Pressable>
+              }}
+            />
           </View>
           <ThemedText type="small" themeColor="textSecondary">
             Required for export filtering and clear work/private separation.
@@ -623,11 +618,12 @@ export default function AddTripScreen() {
             </ThemedText>
           ) : null}
 
-          <Pressable onPress={() => void handleSave()} disabled={!canSubmit} accessibilityState={{ disabled: !canSubmit }}>
-            <ThemedView type="backgroundElement" style={[styles.primaryAction, !canSubmit && styles.primaryActionDisabled]}>
-              <ThemedText type="smallBold">{saving ? 'Saving...' : 'Save Trip'}</ThemedText>
-            </ThemedView>
-          </Pressable>
+          <Button
+            label={saving ? 'Saving...' : 'Save Trip'}
+            onPress={() => void handleSave()}
+            disabled={!canSubmit}
+            className={canSubmit ? 'mt-2' : 'mt-2 opacity-50'}
+          />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -694,24 +690,9 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     flexWrap: 'wrap',
   },
-  tagChip: {
-    borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-  },
   counterText: {
     textAlign: 'right',
     marginTop: -4,
   },
   errorText: {},
-  primaryAction: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    alignItems: 'center',
-    marginTop: Spacing.two,
-  },
-  primaryActionDisabled: {
-    opacity: 0.45,
-  },
 });

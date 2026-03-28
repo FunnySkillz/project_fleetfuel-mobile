@@ -1,4 +1,4 @@
-﻿import { getDatabase } from '@/data/db';
+import { getDatabase } from '@/data/db';
 import { nowIso } from '@/data/db-utils';
 import type {
   EntrySummary,
@@ -178,7 +178,7 @@ function normalizeDateRange(input: {
   };
 }
 
-function appendVehicleScopeClause(whereClauses: string[], params: Array<string | number>, vehicleIds: string[], column: string) {
+function appendVehicleScopeClause(whereClauses: string[], params: (string | number)[], vehicleIds: string[], column: string) {
   if (vehicleIds.length === 0) {
     return;
   }
@@ -190,7 +190,7 @@ function appendVehicleScopeClause(whereClauses: string[], params: Array<string |
 
 function appendDateRangeClause(
   whereClauses: string[],
-  params: Array<string | number>,
+  params: (string | number)[],
   fromIso: string | null,
   toIso: string | null,
   column: string,
@@ -315,7 +315,7 @@ function toExportFilters(filters: NormalizedExportFilters): LogsExportFilters {
 
 async function resolveVehicleScope(db: Awaited<ReturnType<typeof getDatabase>>, vehicleIds: string[]): Promise<VehicleScopeRow[]> {
   const whereClauses: string[] = ['deleted_at IS NULL'];
-  const params: Array<string | number> = [];
+  const params: (string | number)[] = [];
 
   appendVehicleScopeClause(whereClauses, params, vehicleIds, 'id');
 
@@ -335,7 +335,7 @@ async function queryTripsForExport(
   filters: NormalizedExportFilters,
 ): Promise<ExportTripRow[]> {
   const whereClauses: string[] = ['t.deleted_at IS NULL'];
-  const params: Array<string | number> = [];
+  const params: (string | number)[] = [];
 
   appendVehicleScopeClause(whereClauses, params, filters.vehicleIds, 't.vehicle_id');
   appendDateRangeClause(whereClauses, params, filters.fromIso, filters.toIso, 't.occurred_at');
@@ -376,7 +376,7 @@ async function queryFuelForExport(
   }
 
   const whereClauses: string[] = ['f.deleted_at IS NULL'];
-  const params: Array<string | number> = [];
+  const params: (string | number)[] = [];
 
   appendVehicleScopeClause(whereClauses, params, filters.vehicleIds, 'f.vehicle_id');
   appendDateRangeClause(whereClauses, params, filters.fromIso, filters.toIso, 'f.occurred_at');
@@ -521,7 +521,7 @@ export const logsRepo = {
   async list(filters: LogsQueryFilters = {}): Promise<EntrySummary[]> {
     const db = await getDatabase();
     const normalized = normalizeLogFilters(filters);
-    const params: Array<string | number> = [];
+    const params: (string | number)[] = [];
     const whereClauses: string[] = [];
 
     if (normalized.type !== 'all') {

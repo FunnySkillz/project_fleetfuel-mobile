@@ -184,7 +184,7 @@ function mapRecentTrip(row: VehicleRecentTripRow): VehicleRecentTrip {
 function buildUsageSplitPoints(kpi: VehicleInsightKpiRow): VehicleUsageSplitPoint[] {
   const total = kpi.total_distance_km;
 
-  const entries: Array<{ key: VehicleUsageSplitPoint['key']; label: string; distanceKm: number }> = [
+  const entries: { key: VehicleUsageSplitPoint['key']; label: string; distanceKm: number }[] = [
     { key: 'business', label: 'Business', distanceKm: kpi.business_distance_km },
     { key: 'private', label: 'Private', distanceKm: kpi.private_distance_km },
     { key: 'unclassified', label: 'Unclassified', distanceKm: kpi.unclassified_distance_km },

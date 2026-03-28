@@ -6,6 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button, Chip } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo } from '@/data/repositories';
 import type { EntryDetail, TripPrivateTag } from '@/data/types';
@@ -184,28 +185,22 @@ export default function EditEntryScreen() {
                     </ThemedText>
                   ) : null}
                   <View style={styles.tagRow}>
-                    <Pressable
+                    <Chip
+                      label="Business"
+                      active={privateTag === 'business'}
                       onPress={() => {
                         setPrivateTag('business');
                         setTouched((prev) => ({ ...prev, privateTag: true }));
-                      }}>
-                      <ThemedView
-                        type={privateTag === 'business' ? 'backgroundSelected' : 'backgroundElement'}
-                        style={styles.tagChip}>
-                        <ThemedText type="small">Business</ThemedText>
-                      </ThemedView>
-                    </Pressable>
-                    <Pressable
+                      }}
+                    />
+                    <Chip
+                      label="Private"
+                      active={privateTag === 'private'}
                       onPress={() => {
                         setPrivateTag('private');
                         setTouched((prev) => ({ ...prev, privateTag: true }));
-                      }}>
-                      <ThemedView
-                        type={privateTag === 'private' ? 'backgroundSelected' : 'backgroundElement'}
-                        style={styles.tagChip}>
-                        <ThemedText type="small">Private</ThemedText>
-                      </ThemedView>
-                    </Pressable>
+                      }}
+                    />
                   </View>
                   {(submitAttempted || touched.privateTag) && errors.privateTag ? (
                     <ThemedText type="small" style={[styles.errorText, { color: theme.destructive }]}>
@@ -240,11 +235,12 @@ export default function EditEntryScreen() {
                 </ThemedText>
               ) : null}
 
-              <Pressable onPress={() => void handleSave()} disabled={!canSubmit}>
-                <ThemedView type="backgroundElement" style={[styles.primaryAction, !canSubmit && styles.disabledAction]}>
-                  <ThemedText type="smallBold">{saving ? 'Saving...' : 'Save Changes'}</ThemedText>
-                </ThemedView>
-              </Pressable>
+              <Button
+                label={saving ? 'Saving...' : 'Save Changes'}
+                onPress={() => void handleSave()}
+                disabled={!canSubmit}
+                className={canSubmit ? 'mt-2' : 'mt-2 opacity-50'}
+              />
             </>
           )}
         </ScrollView>
@@ -275,11 +271,6 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     flexWrap: 'wrap',
   },
-  tagChip: {
-    borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-  },
   input: {
     borderWidth: 1,
     borderRadius: Spacing.two,
@@ -295,14 +286,4 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   errorText: {},
-  primaryAction: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    alignItems: 'center',
-    marginTop: Spacing.two,
-  },
-  disabledAction: {
-    opacity: 0.45,
-  },
 });

@@ -1,33 +1,18 @@
-﻿import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button, Card, Chip, Input } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { logsRepo, vehiclesRepo } from '@/data/repositories';
 import type { EntrySummary, ExportPreview, LogsExportFilters, TripUsageFilter, VehicleListItem } from '@/data/types';
 import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { generateLogsPdf } from '@/services/export/generate-logs-pdf';
-
-type ChipProps = {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-};
-
-function Chip({ label, active, onPress }: ChipProps) {
-  return (
-    <Pressable onPress={onPress}>
-      <ThemedView type={active ? 'backgroundSelected' : 'backgroundElement'} style={styles.chip}>
-        <ThemedText type="small">{label}</ThemedText>
-      </ThemedView>
-    </Pressable>
-  );
-}
 
 function formatDate(iso: string) {
   const parsed = new Date(iso);
@@ -322,7 +307,7 @@ export default function LogsScreen() {
             </ThemedText>
           </View>
 
-          <ThemedView type="backgroundElement" style={styles.workbenchCard}>
+          <Card className="gap-2 rounded-2xl bg-surface dark:bg-dark-surface">
             <ThemedText type="smallBold">Vehicle Scope</ThemedText>
             <View style={styles.rowWrap}>
               <Chip label="All vehicles" active={allVehiclesScope} onPress={() => setAllVehiclesScope(true)} />
@@ -357,7 +342,7 @@ export default function LogsScreen() {
             <View style={styles.rowTwoCols}>
               <View style={styles.col}>
                 <ThemedText type="small">From (optional)</ThemedText>
-                <TextInput
+                <Input
                   value={fromDate}
                   onChangeText={(value) => {
                     setFromDate(sanitizeDayDateInput(value));
@@ -366,18 +351,14 @@ export default function LogsScreen() {
                     }
                   }}
                   placeholder="2026-01-01"
-                  placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  style={[
-                    styles.input,
-                    { color: theme.text, borderColor: theme.background, backgroundColor: theme.background },
-                  ]}
+                  className="rounded-xl border-surface bg-background dark:border-dark-surface dark:bg-dark-background"
                 />
               </View>
               <View style={styles.col}>
                 <ThemedText type="small">To (optional)</ThemedText>
-                <TextInput
+                <Input
                   value={toDate}
                   onChangeText={(value) => {
                     setToDate(sanitizeDayDateInput(value));
@@ -386,13 +367,9 @@ export default function LogsScreen() {
                     }
                   }}
                   placeholder="2026-12-31"
-                  placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  style={[
-                    styles.input,
-                    { color: theme.text, borderColor: theme.background, backgroundColor: theme.background },
-                  ]}
+                  className="rounded-xl border-surface bg-background dark:border-dark-surface dark:bg-dark-background"
                 />
               </View>
             </View>
@@ -416,7 +393,7 @@ export default function LogsScreen() {
               </ThemedText>
             ) : null}
 
-            <ThemedView type="background" style={styles.previewCard}>
+            <Card className="gap-1 rounded-xl bg-background dark:bg-dark-background">
               <ThemedText type="smallBold">Live Export Preview</ThemedText>
               {previewStatus === 'loading' ? (
                 <View style={styles.loadingRow}>
@@ -441,18 +418,18 @@ export default function LogsScreen() {
                   <ThemedText type="small">Fuel spend: EUR {preview.fuelSpendTotal.toFixed(2)}</ThemedText>
                 </View>
               )}
-            </ThemedView>
+            </Card>
 
-            <Pressable onPress={() => void handleGeneratePdf()} disabled={exportingPdf || Boolean(validationError)}>
-              <ThemedView
-                type="backgroundSelected"
-                style={[styles.generateButton, (exportingPdf || Boolean(validationError)) && styles.disabledAction]}>
-                <ThemedText type="smallBold">{exportingPdf ? 'Generating PDF...' : 'Generate PDF Export'}</ThemedText>
-              </ThemedView>
-            </Pressable>
-          </ThemedView>
+            <Button
+              variant="primary"
+              label={exportingPdf ? 'Generating PDF...' : 'Generate PDF Export'}
+              onPress={() => void handleGeneratePdf()}
+              disabled={exportingPdf || Boolean(validationError)}
+              className={(exportingPdf || Boolean(validationError)) ? 'opacity-50' : undefined}
+            />
+          </Card>
 
-          <ThemedView type="backgroundElement" style={styles.timelineCard}>
+          <Card className="gap-2 rounded-2xl bg-surface dark:bg-dark-surface">
             <View style={styles.timelineHeader}>
               <ThemedText type="smallBold">Timeline (Secondary)</ThemedText>
               <Pressable onPress={() => setShowTimeline((current) => !current)}>
@@ -462,17 +439,13 @@ export default function LogsScreen() {
 
             {showTimeline ? (
               <>
-                <TextInput
+                <Input
                   value={timelineSearch}
                   onChangeText={setTimelineSearch}
                   placeholder="Search timeline"
-                  placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  style={[
-                    styles.input,
-                    { color: theme.text, borderColor: theme.background, backgroundColor: theme.background },
-                  ]}
+                  className="rounded-xl border-surface bg-background dark:border-dark-surface dark:bg-dark-background"
                 />
 
                 {timelineStatus === 'loading' ? (
@@ -521,7 +494,7 @@ export default function LogsScreen() {
                 Open this section when you need detail-level entry navigation.
               </ThemedText>
             )}
-          </ThemedView>
+          </Card>
 
           {vehiclesStatus === 'error' ? (
             <ThemedText type="small" style={{ color: theme.destructive }}>
@@ -554,11 +527,6 @@ const styles = StyleSheet.create({
     fontSize: 36,
     lineHeight: 42,
   },
-  workbenchCard: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.two,
-  },
   rowWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -572,22 +540,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.one,
   },
-  chip: {
-    borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  previewCard: {
-    borderRadius: Spacing.two,
-    padding: Spacing.two,
-    gap: Spacing.one,
-  },
   loadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -595,21 +547,6 @@ const styles = StyleSheet.create({
   },
   previewGrid: {
     gap: Spacing.half,
-  },
-  generateButton: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    alignItems: 'center',
-    marginTop: Spacing.one,
-  },
-  disabledAction: {
-    opacity: 0.45,
-  },
-  timelineCard: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.two,
   },
   timelineHeader: {
     flexDirection: 'row',
