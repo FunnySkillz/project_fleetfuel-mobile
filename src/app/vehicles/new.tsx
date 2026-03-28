@@ -6,6 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { vehiclesRepo } from '@/data/repositories';
 import { sanitizePlateInput, trimmedLength } from '@/utils/form-input';
 import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
@@ -28,6 +29,7 @@ export default function AddVehicleScreen() {
   const [plate, setPlate] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [touched, setTouched] = useState({ name: false, plate: false });
+  const [saving, setSaving] = useState(false);
 
   const isDirty = useMemo(() => name.trim().length > 0 || plate.trim().length > 0, [name, plate]);
   const { allowNextNavigation } = useUnsavedChangesGuard(isDirty);
@@ -64,7 +66,11 @@ export default function AddVehicleScreen() {
   const showNameError = (submitAttempted || touched.name) && Boolean(errors.name);
   const showPlateError = (submitAttempted || touched.plate) && Boolean(errors.plate);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) {
+      return;
+    }
+
     setSubmitAttempted(true);
     setTouched({ name: true, plate: true });
 
@@ -76,16 +82,24 @@ export default function AddVehicleScreen() {
     const normalizedName = name.trim().replace(/\s+/g, ' ');
     const normalizedPlate = plate.trim();
 
-    Alert.alert(
-      'Saved locally (placeholder)',
-      `Vehicle "${normalizedName}" (${normalizedPlate}) is valid and ready for data-layer integration.`,
-    );
-    setName('');
-    setPlate('');
-    setTouched({ name: false, plate: false });
-    setSubmitAttempted(false);
-    allowNextNavigation();
-    router.back();
+    setSaving(true);
+    try {
+      await vehiclesRepo.create({
+        name: normalizedName,
+        plate: normalizedPlate,
+      });
+
+      setName('');
+      setPlate('');
+      setTouched({ name: false, plate: false });
+      setSubmitAttempted(false);
+      allowNextNavigation();
+      router.back();
+    } catch (error) {
+      Alert.alert('Could not save vehicle', error instanceof Error ? error.message : 'Unexpected error.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -154,11 +168,14 @@ export default function AddVehicleScreen() {
           </View>
 
           <View style={styles.actions}>
-            <Pressable onPress={handleSave} disabled={!canSubmit} accessibilityState={{ disabled: !canSubmit }}>
+            <Pressable
+              onPress={() => void handleSave()}
+              disabled={!canSubmit || saving}
+              accessibilityState={{ disabled: !canSubmit || saving }}>
               <ThemedView
                 type="backgroundElement"
-                style={[styles.primaryAction, !canSubmit && styles.primaryActionDisabled]}>
-                <ThemedText type="smallBold">Save Vehicle</ThemedText>
+                style={[styles.primaryAction, (!canSubmit || saving) && styles.primaryActionDisabled]}>
+                <ThemedText type="smallBold">{saving ? 'Saving...' : 'Save Vehicle'}</ThemedText>
               </ThemedView>
             </Pressable>
           </View>

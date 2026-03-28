@@ -1,11 +1,13 @@
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { entriesRepo, vehiclesRepo } from '@/data/repositories';
 
 type DashboardCardProps = {
   label: string;
@@ -31,6 +33,42 @@ function DashboardCard({ label, value, helper }: DashboardCardProps) {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
+  const [carsTracked, setCarsTracked] = useState(0);
+  const [tripsThisMonth, setTripsThisMonth] = useState(0);
+  const [fuelThisMonth, setFuelThisMonth] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isFocused) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoadError(null);
+
+    void Promise.all([vehiclesRepo.countActive(), entriesRepo.countMonthly()])
+      .then(([vehicleCount, monthlyCounts]) => {
+        if (cancelled) {
+          return;
+        }
+
+        setCarsTracked(vehicleCount);
+        setTripsThisMonth(monthlyCounts.trips);
+        setFuelThisMonth(monthlyCounts.fuelEntries);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        setLoadError(error instanceof Error ? error.message : 'Failed to load dashboard metrics.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFocused]);
 
   return (
     <ThemedView style={styles.container}>
@@ -43,13 +81,22 @@ export default function DashboardScreen() {
             <ThemedText themeColor="textSecondary">
               Local-first overview. Drivers are deferred to post-MVP company platform.
             </ThemedText>
+            {loadError ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                Metrics warning: {loadError}
+              </ThemedText>
+            ) : null}
           </View>
 
           <View style={styles.grid}>
-            <DashboardCard label="Cars tracked" value="0" helper="Start by adding your first vehicle." />
+            <DashboardCard
+              label="Cars tracked"
+              value={String(carsTracked)}
+              helper={carsTracked === 0 ? 'Start by adding your first vehicle.' : undefined}
+            />
             <DashboardCard label="Drivers under you" value="0" helper="Deferred in MVP." />
-            <DashboardCard label="Trips this month" value="0" />
-            <DashboardCard label="Fuel entries this month" value="0" />
+            <DashboardCard label="Trips this month" value={String(tripsThisMonth)} />
+            <DashboardCard label="Fuel entries this month" value={String(fuelThisMonth)} />
           </View>
 
           <ThemedView type="backgroundElement" style={styles.quickActions}>

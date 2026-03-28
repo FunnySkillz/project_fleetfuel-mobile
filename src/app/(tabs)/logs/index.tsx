@@ -1,55 +1,25 @@
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { logsRepo, vehiclesRepo } from '@/data/repositories';
+import type { EntrySummary, EntryType, VehicleListItem } from '@/data/types';
 import { useTheme } from '@/hooks/use-theme';
-
-type LogType = 'trip' | 'fuel';
-
-type LogEntry = {
-  id: string;
-  type: LogType;
-  vehicleId: string;
-  vehicleName: string;
-  date: string;
-  summary: string;
-};
-
-const LOG_ENTRIES: LogEntry[] = [
-  {
-    id: 'trip-1001',
-    type: 'trip',
-    vehicleId: 'car-01',
-    vehicleName: 'VW Golf',
-    date: '2026-03-27',
-    summary: 'Client meeting, 42 km',
-  },
-  {
-    id: 'fuel-2201',
-    type: 'fuel',
-    vehicleId: 'car-01',
-    vehicleName: 'VW Golf',
-    date: '2026-03-26',
-    summary: '42.4 L, EUR 72.10',
-  },
-  {
-    id: 'trip-1002',
-    type: 'trip',
-    vehicleId: 'car-02',
-    vehicleName: 'Ford Transit',
-    date: '2026-03-25',
-    summary: 'Supplier pickup, 71 km',
-  },
-];
 
 type FilterChipProps = {
   label: string;
   active: boolean;
   onPress: () => void;
+};
+
+type VehicleFilterOption = {
+  id: string;
+  label: string;
 };
 
 function FilterChip({ label, active, onPress }: FilterChipProps) {
@@ -62,41 +32,104 @@ function FilterChip({ label, active, onPress }: FilterChipProps) {
   );
 }
 
+function formatDate(iso: string) {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) {
+    return iso;
+  }
+
+  return parsed.toISOString().slice(0, 10);
+}
+
 export default function LogsScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const theme = useTheme();
-  const [typeFilter, setTypeFilter] = useState<'all' | LogType>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | EntryType>('all');
   const [vehicleFilter, setVehicleFilter] = useState<'all' | string>('all');
   const [query, setQuery] = useState('');
+  const [entries, setEntries] = useState<EntrySummary[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleListItem[]>([]);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const logsRequestRef = useRef(0);
+  const vehiclesRequestRef = useRef(0);
 
-  const vehicleOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    LOG_ENTRIES.forEach((entry) => map.set(entry.vehicleId, entry.vehicleName));
-    return [{ id: 'all', label: 'All vehicles' }, ...Array.from(map.entries()).map(([id, label]) => ({ id, label }))];
+  const loadVehicleFilters = useCallback(async () => {
+    const requestId = ++vehiclesRequestRef.current;
+    try {
+      const data = await vehiclesRepo.list();
+      if (requestId !== vehiclesRequestRef.current) {
+        return;
+      }
+
+      setVehicles(data);
+    } catch {
+      if (requestId !== vehiclesRequestRef.current) {
+        return;
+      }
+
+      setVehicles([]);
+    }
   }, []);
 
-  const filteredEntries = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return [...LOG_ENTRIES]
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .filter((entry) => {
-        const typeMatches = typeFilter === 'all' || entry.type === typeFilter;
-        const vehicleMatches = vehicleFilter === 'all' || entry.vehicleId === vehicleFilter;
-        const queryMatches =
-          needle.length === 0 ||
-          entry.summary.toLowerCase().includes(needle) ||
-          entry.vehicleName.toLowerCase().includes(needle) ||
-          entry.date.includes(needle);
+  const loadEntries = useCallback(async () => {
+    const requestId = ++logsRequestRef.current;
+    setErrorMessage(null);
+    setStatus((previous) => (previous === 'ready' ? 'ready' : 'loading'));
 
-        return typeMatches && vehicleMatches && queryMatches;
+    try {
+      const data = await logsRepo.list({
+        type: typeFilter,
+        vehicleId: vehicleFilter === 'all' ? null : vehicleFilter,
+        search: query,
       });
+
+      if (requestId !== logsRequestRef.current) {
+        return;
+      }
+
+      setEntries(data);
+      setStatus('ready');
+    } catch (error) {
+      if (requestId !== logsRequestRef.current) {
+        return;
+      }
+
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load logs.');
+    }
   }, [query, typeFilter, vehicleFilter]);
+
+  useEffect(() => {
+    if (!isFocused) {
+      return;
+    }
+
+    void loadVehicleFilters();
+    void loadEntries();
+  }, [isFocused, loadEntries, loadVehicleFilters]);
+
+  useEffect(() => {
+    if (vehicleFilter === 'all') {
+      return;
+    }
+
+    const stillExists = vehicles.some((vehicle) => vehicle.id === vehicleFilter);
+    if (!stillExists) {
+      setVehicleFilter('all');
+    }
+  }, [vehicleFilter, vehicles]);
+
+  const vehicleOptions = useMemo<VehicleFilterOption[]>(() => {
+    return [{ id: 'all', label: 'All vehicles' }, ...vehicles.map((vehicle) => ({ id: vehicle.id, label: vehicle.name }))];
+  }, [vehicles]);
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <FlatList
-          data={filteredEntries}
+          data={entries}
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.content}
@@ -109,7 +142,18 @@ export default function LogsScreen() {
                 <ThemedText themeColor="textSecondary">Unified timeline for trip and fuel entries.</ThemedText>
               </View>
 
-              <Pressable onPress={() => router.push('/logs/export')} style={styles.exportButton}>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/logs/export',
+                    params: {
+                      type: typeFilter,
+                      vehicleId: vehicleFilter === 'all' ? '' : vehicleFilter,
+                      search: query,
+                    },
+                  })
+                }
+                style={styles.exportButton}>
                 <ThemedView type="backgroundElement" style={styles.exportSurface}>
                   <ThemedText type="smallBold">Export Logs</ThemedText>
                 </ThemedView>
@@ -157,18 +201,37 @@ export default function LogsScreen() {
                 </View>
 
                 <ThemedText type="small" themeColor="textSecondary">
-                  {filteredEntries.length} result{filteredEntries.length === 1 ? '' : 's'}
+                  {entries.length} result{entries.length === 1 ? '' : 's'}
                 </ThemedText>
               </View>
             </View>
           }
           ListEmptyComponent={
-            <ThemedView type="backgroundElement" style={styles.emptyState}>
-              <ThemedText type="smallBold">No matching entries</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Try a broader filter or add a new trip/fuel entry.
-              </ThemedText>
-            </ThemedView>
+            status === 'loading' ? (
+              <ThemedView type="backgroundElement" style={styles.emptyState}>
+                <ActivityIndicator color={theme.textSecondary} />
+                <ThemedText type="small" themeColor="textSecondary">
+                  Loading timeline...
+                </ThemedText>
+              </ThemedView>
+            ) : status === 'error' ? (
+              <ThemedView type="backgroundElement" style={styles.emptyState}>
+                <ThemedText type="smallBold">Could not load logs</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {errorMessage ?? 'Unexpected error.'}
+                </ThemedText>
+                <Pressable onPress={() => void loadEntries()}>
+                  <ThemedText type="link">Retry</ThemedText>
+                </Pressable>
+              </ThemedView>
+            ) : (
+              <ThemedView type="backgroundElement" style={styles.emptyState}>
+                <ThemedText type="smallBold">No matching entries</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Try a broader filter or add a new trip/fuel entry.
+                </ThemedText>
+              </ThemedView>
+            )
           }
           renderItem={({ item: entry }) => (
             <Pressable
@@ -178,8 +241,6 @@ export default function LogsScreen() {
                   params: {
                     entryId: entry.id,
                     type: entry.type,
-                    vehicleName: entry.vehicleName,
-                    summary: entry.summary,
                   },
                 })
               }>
@@ -193,7 +254,7 @@ export default function LogsScreen() {
                 </View>
                 <View style={styles.rowRight}>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {entry.date}
+                    {formatDate(entry.date)}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
                     {'>'}

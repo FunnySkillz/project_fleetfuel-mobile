@@ -1,5 +1,5 @@
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
-import { Tabs, useRouter } from 'expo-router';
+import { type Href, Tabs, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
 import {
   ActionSheetIOS,
@@ -39,7 +39,7 @@ export default function TabsLayout() {
   const router = useRouter();
 
   const openAddMenu = useCallback(() => {
-    const goTo = (path: string) => {
+    const goTo = (path: Href) => {
       router.push(path);
     };
 

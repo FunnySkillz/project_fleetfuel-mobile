@@ -1,92 +1,151 @@
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { vehiclesRepo } from '@/data/repositories';
+import type { VehicleListItem } from '@/data/types';
 import { useTheme } from '@/hooks/use-theme';
 
-const VEHICLES = [
-  { id: 'car-01', name: 'VW Golf', plate: 'W-123AB', mileage: '84,200 km' },
-  { id: 'car-02', name: 'Ford Transit', plate: 'W-987CD', mileage: '152,910 km' },
-];
+function formatDate(iso: string | null) {
+  if (!iso) {
+    return 'No activity yet';
+  }
+
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) {
+    return iso;
+  }
+
+  return parsed.toISOString().slice(0, 10);
+}
 
 export default function VehiclesScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const theme = useTheme();
   const [query, setQuery] = useState('');
+  const [vehicles, setVehicles] = useState<VehicleListItem[]>([]);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const requestRef = useRef(0);
 
-  const filteredVehicles = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return [...VEHICLES]
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .filter((vehicle) => {
-        if (!needle) return true;
-        return (
-          vehicle.name.toLowerCase().includes(needle) ||
-          vehicle.plate.toLowerCase().includes(needle) ||
-          vehicle.mileage.toLowerCase().includes(needle)
-        );
-      });
-  }, [query]);
+  const loadVehicles = useCallback(async (searchText: string) => {
+    const requestId = ++requestRef.current;
+    setErrorMessage(null);
+    setStatus((previous) => (previous === 'ready' ? 'ready' : 'loading'));
+
+    try {
+      const data = await vehiclesRepo.list(searchText);
+      if (requestId !== requestRef.current) {
+        return;
+      }
+
+      setVehicles(data);
+      setStatus('ready');
+    } catch (error) {
+      if (requestId !== requestRef.current) {
+        return;
+      }
+
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load vehicles.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isFocused) {
+      return;
+    }
+
+    void loadVehicles(query);
+  }, [isFocused, loadVehicles, query]);
+
+  const hasQuery = query.trim().length > 0;
+
+  const listHeader = useMemo(
+    () => (
+      <View style={styles.headerSection}>
+        <View style={styles.header}>
+          <ThemedText type="title" style={styles.title}>
+            Vehicles
+          </ThemedText>
+          <ThemedText themeColor="textSecondary">Choose a vehicle to manage trips and fuel logs.</ThemedText>
+        </View>
+
+        <Pressable onPress={() => router.push('/vehicles/new')} style={styles.primaryButton}>
+          <ThemedView type="backgroundElement" style={styles.primarySurface}>
+            <ThemedText type="smallBold">Add Vehicle</ThemedText>
+          </ThemedView>
+        </Pressable>
+
+        <View style={styles.searchSection}>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by name or plate"
+            placeholderTextColor={theme.textSecondary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+            style={[
+              styles.searchInput,
+              {
+                color: theme.text,
+                borderColor: theme.backgroundElement,
+                backgroundColor: theme.background,
+              },
+            ]}
+          />
+          <ThemedText type="small" themeColor="textSecondary">
+            {vehicles.length} result{vehicles.length === 1 ? '' : 's'}
+          </ThemedText>
+        </View>
+      </View>
+    ),
+    [query, router, theme.background, theme.backgroundElement, theme.text, theme.textSecondary, vehicles.length],
+  );
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <FlatList
-          data={filteredVehicles}
+          data={vehicles}
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.content}
-          ListHeaderComponent={
-            <View style={styles.headerSection}>
-              <View style={styles.header}>
-                <ThemedText type="title" style={styles.title}>
-                  Vehicles
-                </ThemedText>
-                <ThemedText themeColor="textSecondary">Choose a vehicle to manage trips and fuel logs.</ThemedText>
-              </View>
-
-              <Pressable onPress={() => router.push('/vehicles/new')} style={styles.primaryButton}>
-                <ThemedView type="backgroundElement" style={styles.primarySurface}>
-                  <ThemedText type="smallBold">Add Vehicle</ThemedText>
-                </ThemedView>
-              </Pressable>
-
-              <View style={styles.searchSection}>
-                <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Search by name, plate, or mileage"
-                  placeholderTextColor={theme.textSecondary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="search"
-                  clearButtonMode="while-editing"
-                  style={[
-                    styles.searchInput,
-                    {
-                      color: theme.text,
-                      borderColor: theme.backgroundElement,
-                      backgroundColor: theme.background,
-                    },
-                  ]}
-                />
-                <ThemedText type="small" themeColor="textSecondary">
-                  {filteredVehicles.length} result{filteredVehicles.length === 1 ? '' : 's'}
-                </ThemedText>
-              </View>
-            </View>
-          }
+          ListHeaderComponent={listHeader}
           ListEmptyComponent={
-            <ThemedView type="backgroundElement" style={styles.emptyState}>
-              <ThemedText type="smallBold">No vehicles found</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Try a broader search or create a new vehicle.
-              </ThemedText>
-            </ThemedView>
+            status === 'loading' ? (
+              <ThemedView type="backgroundElement" style={styles.emptyState}>
+                <ActivityIndicator color={theme.textSecondary} />
+                <ThemedText type="small" themeColor="textSecondary">
+                  Loading vehicles...
+                </ThemedText>
+              </ThemedView>
+            ) : status === 'error' ? (
+              <ThemedView type="backgroundElement" style={styles.emptyState}>
+                <ThemedText type="smallBold">Could not load vehicles</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {errorMessage ?? 'Unexpected error.'}
+                </ThemedText>
+                <Pressable onPress={() => void loadVehicles(query)}>
+                  <ThemedText type="link">Retry</ThemedText>
+                </Pressable>
+              </ThemedView>
+            ) : (
+              <ThemedView type="backgroundElement" style={styles.emptyState}>
+                <ThemedText type="smallBold">{hasQuery ? 'No vehicles found' : 'No vehicles yet'}</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {hasQuery ? 'Try a broader search term.' : 'Create your first vehicle to begin logging trips and fuel.'}
+                </ThemedText>
+              </ThemedView>
+            )
           }
           renderItem={({ item: vehicle }) => (
             <Pressable
@@ -102,10 +161,13 @@ export default function VehiclesScreen() {
                   <ThemedText type="small" themeColor="textSecondary">
                     {vehicle.plate}
                   </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Trips: {vehicle.tripCount} | Fuel: {vehicle.fuelCount}
+                  </ThemedText>
                 </View>
                 <View style={styles.rowRight}>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {vehicle.mileage}
+                    {formatDate(vehicle.lastActivityAt)}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
                     {'>'}
