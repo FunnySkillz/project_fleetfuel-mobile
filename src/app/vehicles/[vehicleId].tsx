@@ -9,6 +9,7 @@ import { Button, Card, EmptyState, ListRow, SectionHeader } from '@/components/u
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
 import type { VehicleInsightSummary, VehicleUsageSplitPoint } from '@/data/types';
+import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 
 function formatDate(iso: string) {
@@ -24,15 +25,15 @@ function formatCurrency(value: number) {
   return `EUR ${value.toFixed(2)}`;
 }
 
-function tripTagLabel(value: 'private' | 'business' | null) {
+function tripTagLabel(value: 'private' | 'business' | null, labels: { work: string; private: string; unclassified: string }) {
   if (value === 'business') {
-    return 'Work';
+    return labels.work;
   }
   if (value === 'private') {
-    return 'Private';
+    return labels.private;
   }
 
-  return 'Unclassified';
+  return labels.unclassified;
 }
 
 function usageColor(point: VehicleUsageSplitPoint, accent: string, text: string, textSecondary: string) {
@@ -66,6 +67,7 @@ export default function VehicleDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const { t } = useI18n();
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ vehicleId?: string }>();
   const vehicleId = (params.vehicleId ?? '').trim();
@@ -78,7 +80,7 @@ export default function VehicleDetailScreen() {
   const loadVehicleInsight = useCallback(async () => {
     if (!vehicleId) {
       setStatus('error');
-      setErrorMessage('Missing vehicle id.');
+      setErrorMessage(t('vehicleDetail.errorMissingId'));
       setSummary(null);
       return;
     }
@@ -91,7 +93,7 @@ export default function VehicleDetailScreen() {
 
       if (!data) {
         setStatus('error');
-        setErrorMessage('Vehicle not found. It may have been deleted.');
+        setErrorMessage(t('vehicleDetail.errorNotFound'));
         setSummary(null);
         return;
       }
@@ -100,10 +102,10 @@ export default function VehicleDetailScreen() {
       setStatus('ready');
     } catch (error) {
       setStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to load vehicle insight.');
+      setErrorMessage(error instanceof Error ? error.message : t('vehicleDetail.errorLoadFailedFallback'));
       setSummary(null);
     }
-  }, [vehicleId]);
+  }, [t, vehicleId]);
 
   useEffect(() => {
     if (!isFocused) {
@@ -128,12 +130,12 @@ export default function VehicleDetailScreen() {
     }
 
     Alert.alert(
-      'Delete vehicle?',
-      'This will also delete all related trips and fuel entries on this device.',
+      t('vehicleDetail.deleteTitle'),
+      t('vehicleDetail.deleteMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('vehicleDetail.deleteAction'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
@@ -142,7 +144,7 @@ export default function VehicleDetailScreen() {
                 await vehiclesRepo.delete(summary.vehicle.id);
                 router.replace('/vehicles');
               } catch (error) {
-                Alert.alert('Could not delete vehicle', error instanceof Error ? error.message : 'Unexpected error.');
+                Alert.alert(t('vehicleDetail.deleteFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
               } finally {
                 setDeleting(false);
               }
@@ -163,14 +165,14 @@ export default function VehicleDetailScreen() {
           {status === 'loading' ? (
             <Card className="gap-2">
               <ActivityIndicator color={theme.textSecondary} />
-              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Loading vehicle insight...</Text>
+              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('vehicleDetail.loading')}</Text>
             </Card>
           ) : status === 'error' || !summary ? (
             <EmptyState
               tone="destructive"
-              title="Could not load vehicle insight"
-              description={errorMessage ?? 'Unexpected error.'}
-              actionLabel="Retry"
+              title={t('vehicleDetail.errorLoadTitle')}
+              description={errorMessage ?? t('common.unexpectedError')}
+              actionLabel={t('common.retry')}
               onAction={() => void loadVehicleInsight()}
             />
           ) : (
@@ -181,35 +183,35 @@ export default function VehicleDetailScreen() {
               />
 
               <Card className="gap-1.5">
-                <Text className="text-sm font-semibold text-text dark:text-dark-text">Vehicle Identity & Specs</Text>
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">VIN / FIN: {summary.vehicle.vin ?? '-'}</Text>
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Engine code: {summary.vehicle.engineTypeCode ?? '-'}</Text>
+                <Text className="text-sm font-semibold text-text dark:text-dark-text">{t('vehicleDetail.identityTitle')}</Text>
+                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('vehicleDetail.vinLabel', { value: summary.vehicle.vin ?? '-' })}</Text>
+                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('vehicleDetail.engineCodeLabel', { value: summary.vehicle.engineTypeCode ?? '-' })}</Text>
                 <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
-                  Power: {summary.vehicle.ps ?? '-'} PS / {summary.vehicle.kw ?? '-'} kW
+                  {t('vehicleDetail.powerLabel', { ps: summary.vehicle.ps ?? '-', kw: summary.vehicle.kw ?? '-' })}
                 </Text>
                 <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
-                  Displacement: {summary.vehicle.engineDisplacementCc ?? '-'} ccm
+                  {t('vehicleDetail.displacementLabel', { value: summary.vehicle.engineDisplacementCc ?? '-' })}
                 </Text>
               </Card>
 
               <View style={styles.kpiGrid}>
-                <KpiCard label="Total trips" value={String(summary.kpis.totalTrips)} />
-                <KpiCard label="Total distance" value={`${summary.kpis.totalDistanceKm} km`} />
-                <KpiCard label="Work distance" value={`${summary.kpis.businessDistanceKm} km`} />
-                <KpiCard label="Private distance" value={`${summary.kpis.privateDistanceKm} km`} />
-                <KpiCard label="Fuel spend" value={formatCurrency(summary.kpis.fuelSpendTotal)} />
+                <KpiCard label={t('vehicleDetail.kpi.totalTrips')} value={String(summary.kpis.totalTrips)} />
+                <KpiCard label={t('vehicleDetail.kpi.totalDistance')} value={`${summary.kpis.totalDistanceKm} km`} />
+                <KpiCard label={t('vehicleDetail.kpi.workDistance')} value={`${summary.kpis.businessDistanceKm} km`} />
+                <KpiCard label={t('vehicleDetail.kpi.privateDistance')} value={`${summary.kpis.privateDistanceKm} km`} />
+                <KpiCard label={t('vehicleDetail.kpi.fuelSpend')} value={formatCurrency(summary.kpis.fuelSpendTotal)} />
                 <KpiCard
-                  label="Avg consumption"
+                  label={t('vehicleDetail.kpi.avgConsumption')}
                   value={
                     summary.kpis.avgConsumptionLPer100Km !== null
                       ? `${summary.kpis.avgConsumptionLPer100Km.toFixed(2)} L/100km`
-                      : 'Not enough data'
+                      : t('vehicleDetail.notEnoughData')
                   }
                 />
               </View>
 
               <Card className="gap-2">
-                <Text className="text-sm font-semibold text-text dark:text-dark-text">Monthly Distance (last 6 months)</Text>
+                <Text className="text-sm font-semibold text-text dark:text-dark-text">{t('vehicleDetail.monthlyDistanceTitle')}</Text>
                 <View style={styles.chartRows}>
                   {summary.monthlyDistance.map((point) => {
                     const widthPercent = Math.max(4, Math.round((point.distanceKm / monthlyMax) * 100));
@@ -237,7 +239,7 @@ export default function VehicleDetailScreen() {
               </Card>
 
               <Card className="gap-2">
-                <Text className="text-sm font-semibold text-text dark:text-dark-text">Work / Private Split</Text>
+                <Text className="text-sm font-semibold text-text dark:text-dark-text">{t('vehicleDetail.usageSplitTitle')}</Text>
                 <View style={styles.chartRows}>
                   {summary.usageSplit.map((item) => {
                     const widthPercent = Math.max(4, Math.round(item.ratio * 100));
@@ -266,7 +268,7 @@ export default function VehicleDetailScreen() {
 
               <Card className="gap-2">
                 <Button
-                  label="Add Trip"
+                  label={t('vehicleDetail.addTrip')}
                   variant="secondary"
                   onPress={() =>
                     router.push({
@@ -276,7 +278,7 @@ export default function VehicleDetailScreen() {
                   }
                 />
                 <Button
-                  label="Add Fuel Entry"
+                  label={t('vehicleDetail.addFuel')}
                   variant="secondary"
                   onPress={() =>
                     router.push({
@@ -288,16 +290,20 @@ export default function VehicleDetailScreen() {
               </Card>
 
               <Card className="gap-2">
-                <SectionHeader title="Recent Trips" actionLabel="Open Logs" onAction={() => router.push('/logs')} />
+                <SectionHeader title={t('vehicleDetail.recentTripsTitle')} actionLabel={t('vehicleDetail.openLogs')} onAction={() => router.push('/logs')} />
 
                 {summary.recentTrips.length === 0 ? (
-                  <EmptyState title="No trips recorded" description="Add your first trip for this vehicle." />
+                  <EmptyState title={t('vehicleDetail.emptyTripsTitle')} description={t('vehicleDetail.emptyTripsDescription')} />
                 ) : (
                   summary.recentTrips.map((trip) => (
                     <ListRow
                       key={trip.id}
                       title={trip.purpose}
-                      subtitle={`${tripTagLabel(trip.privateTag)} | ${trip.distanceKm} km | ${trip.startLocation ?? 'N/A'} -> ${trip.endLocation ?? 'N/A'}`}
+                      subtitle={`${tripTagLabel(trip.privateTag, {
+                        work: t('common.vehicleWork'),
+                        private: t('common.vehiclePrivate'),
+                        unclassified: t('common.unclassified'),
+                      })} | ${trip.distanceKm} km | ${trip.startLocation ?? t('common.notAvailable')} -> ${trip.endLocation ?? t('common.notAvailable')}`}
                       meta={formatDate(trip.occurredAt)}
                       onPress={() =>
                         router.push({
@@ -311,7 +317,7 @@ export default function VehicleDetailScreen() {
               </Card>
 
               <Button
-                label={deleting ? 'Deleting...' : 'Delete Vehicle'}
+                label={deleting ? t('vehicleDetail.deleting') : t('vehicleDetail.deleteAction')}
                 variant="destructive"
                 loading={deleting}
                 disabled={deleting}

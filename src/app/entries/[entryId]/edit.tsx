@@ -9,6 +9,7 @@ import { Button, Card, FormField, Input, SectionHeader, SelectField, TextArea } 
 import { Spacing } from '@/constants/theme';
 import { entriesRepo } from '@/data/repositories';
 import type { EntryDetail, TripPrivateTag } from '@/data/types';
+import { useI18n } from '@/hooks/use-i18n';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { trimmedLength } from '@/utils/form-input';
 
@@ -28,6 +29,7 @@ export default function EditEntryScreen() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ entryId?: string }>();
+  const { t } = useI18n();
   const entryId = (params.entryId ?? '').trim();
 
   const initialStateRef = useRef<{ notes: string; privateTag: TripPrivateTag }>({ notes: '', privateTag: null });
@@ -44,7 +46,7 @@ export default function EditEntryScreen() {
   const loadEntry = useCallback(async () => {
     if (!entryId) {
       setStatus('error');
-      setErrorMessage('Missing entry id.');
+      setErrorMessage(t('entryEdit.errorMissingId'));
       setEntry(null);
       return;
     }
@@ -56,7 +58,7 @@ export default function EditEntryScreen() {
       const data = await entriesRepo.getById(entryId);
       if (!data) {
         setStatus('error');
-        setErrorMessage('Entry not found. It may have been deleted.');
+        setErrorMessage(t('entryEdit.errorNotFound'));
         setEntry(null);
         return;
       }
@@ -77,10 +79,10 @@ export default function EditEntryScreen() {
       setStatus('ready');
     } catch (error) {
       setStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to load entry.');
+      setErrorMessage(error instanceof Error ? error.message : t('entryEdit.errorLoadFailedFallback'));
       setEntry(null);
     }
-  }, [entryId]);
+  }, [entryId, t]);
 
   useEffect(() => {
     if (!isFocused) {
@@ -94,15 +96,15 @@ export default function EditEntryScreen() {
     const result: EditEntryErrors = {};
 
     if (trimmedLength(notes) > NOTES_MAX) {
-      result.notes = `Notes must be at most ${NOTES_MAX} characters.`;
+      result.notes = t('entryEdit.errorNotesMax', { max: NOTES_MAX });
     }
 
     if (entry?.type === 'trip' && privateTag === null) {
-      result.privateTag = 'Trip classification is required (Business or Private).';
+      result.privateTag = t('entryEdit.errorClassificationRequired');
     }
 
     return result;
-  }, [entry?.type, notes, privateTag]);
+  }, [entry?.type, notes, privateTag, t]);
 
   const normalizedNotes = normalizeNotes(notes);
   const isDirty =
@@ -124,7 +126,7 @@ export default function EditEntryScreen() {
     setTouched({ notes: true, privateTag: true });
 
     if (!isValid) {
-      Alert.alert('Check form', 'Please fix validation errors before saving.');
+      Alert.alert(t('common.checkFormTitle'), t('common.fixValidationErrors'));
       return;
     }
 
@@ -138,7 +140,7 @@ export default function EditEntryScreen() {
       allowNextNavigation();
       router.back();
     } catch (error) {
-      Alert.alert('Could not save changes', error instanceof Error ? error.message : 'Unexpected error.');
+      Alert.alert(t('entryEdit.saveFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
     } finally {
       setSaving(false);
     }
@@ -152,31 +154,31 @@ export default function EditEntryScreen() {
           automaticallyAdjustContentInsets={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
-          <SectionHeader title="Edit Entry" description={entry ? `Editing entry: ${entry.id}` : 'Update editable fields only.'} />
+          <SectionHeader title={t('entryEdit.title')} description={entry ? t('entryEdit.descriptionLoaded', { id: entry.id }) : t('entryEdit.descriptionLoading')} />
 
           {status === 'loading' ? (
             <Card>
-              <Input value="Loading entry..." editable={false} variant="subtle" />
+              <Input value={t('entryEdit.loading')} editable={false} variant="subtle" />
             </Card>
           ) : status === 'error' || !entry ? (
             <Card tone="destructive" className="gap-2">
-              <FormField label="Load Error" error={errorMessage ?? 'Unexpected error.'}>
-                <Input value="Could not load entry" editable={false} variant="subtle" tone="destructive" />
+              <FormField label={t('entryEdit.loadErrorLabel')} error={errorMessage ?? t('common.unexpectedError')}>
+                <Input value={t('entryEdit.errorLoadTitle')} editable={false} variant="subtle" tone="destructive" />
               </FormField>
-              <Button label="Retry" variant="ghost" tone="destructive" onPress={() => void loadEntry()} className="self-start" />
+              <Button label={t('common.retry')} variant="ghost" tone="destructive" onPress={() => void loadEntry()} className="self-start" />
             </Card>
           ) : (
             <Card className="gap-3">
               {entry.type === 'trip' ? (
                 <FormField
-                  label="Private/Business Tag"
+                  label={t('entryEdit.classificationLabel')}
                   required
-                  hint={privateTag === null ? 'Legacy entry is unclassified. Select Business or Private before saving.' : undefined}
+                  hint={privateTag === null ? t('entryEdit.classificationHintLegacy') : undefined}
                   error={(submitAttempted || touched.privateTag) ? errors.privateTag : null}>
                   <SelectField
                     options={[
-                      { value: 'business', label: 'Business' },
-                      { value: 'private', label: 'Private' },
+                      { value: 'business', label: t('tripForm.classification.business') },
+                      { value: 'private', label: t('tripForm.classification.private') },
                     ]}
                     value={privateTag}
                     onChange={(value) => {
@@ -188,14 +190,14 @@ export default function EditEntryScreen() {
               ) : null}
 
               <FormField
-                label="Notes"
+                label={t('entryEdit.notesLabel')}
                 hint={`${trimmedLength(notes)}/${NOTES_MAX}`}
                 error={showNotesError ? errors.notes : null}>
                 <TextArea
                   value={notes}
                   onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
                   onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
-                  placeholder="Update notes"
+                  placeholder={t('entryEdit.notesPlaceholder')}
                   autoCapitalize="sentences"
                   tone={showNotesError ? 'destructive' : 'neutral'}
                 />
@@ -204,10 +206,10 @@ export default function EditEntryScreen() {
           )}
 
           <Button
-            label="Save Changes"
+            label={t('entryEdit.saveAction')}
             variant="primary"
             loading={saving}
-            loadingLabel="Saving..."
+            loadingLabel={t('entryEdit.saving')}
             disabled={!canSubmit}
             onPress={() => void handleSave()}
           />

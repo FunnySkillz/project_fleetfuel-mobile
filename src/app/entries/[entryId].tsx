@@ -8,7 +8,8 @@ import { ThemedView } from '@/components/themed-view';
 import { Button, Card, EmptyState, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo } from '@/data/repositories';
-import type { EntryDetail } from '@/data/types';
+import type { EntryDetail, FuelType } from '@/data/types';
+import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 
 function formatDateTime(iso: string) {
@@ -18,6 +19,34 @@ function formatDateTime(iso: string) {
   }
 
   return `${parsed.toISOString().slice(0, 10)} ${parsed.toISOString().slice(11, 16)} UTC`;
+}
+
+type FuelTypeTranslationKey =
+  | 'common.notAvailable'
+  | 'fuelForm.fuelType.petrol'
+  | 'fuelForm.fuelType.diesel'
+  | 'fuelForm.fuelType.electric'
+  | 'fuelForm.fuelType.hybrid'
+  | 'fuelForm.fuelType.lpg'
+  | 'fuelForm.fuelType.cng'
+  | 'fuelForm.fuelType.other';
+
+function fuelTypeLabel(value: FuelType | null, translate: (key: FuelTypeTranslationKey) => string) {
+  if (!value) {
+    return translate('common.notAvailable');
+  }
+
+  const labels = {
+    petrol: translate('fuelForm.fuelType.petrol'),
+    diesel: translate('fuelForm.fuelType.diesel'),
+    electric: translate('fuelForm.fuelType.electric'),
+    hybrid: translate('fuelForm.fuelType.hybrid'),
+    lpg: translate('fuelForm.fuelType.lpg'),
+    cng: translate('fuelForm.fuelType.cng'),
+    other: translate('fuelForm.fuelType.other'),
+  } as const;
+
+  return labels[value];
 }
 
 type DetailLineProps = {
@@ -42,6 +71,7 @@ export default function EntryDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const { t } = useI18n();
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ entryId?: string }>();
   const entryId = (params.entryId ?? '').trim();
@@ -54,7 +84,7 @@ export default function EntryDetailScreen() {
   const loadEntry = useCallback(async () => {
     if (!entryId) {
       setStatus('error');
-      setErrorMessage('Missing entry id.');
+      setErrorMessage(t('entryDetail.errorMissingId'));
       setEntry(null);
       return;
     }
@@ -66,7 +96,7 @@ export default function EntryDetailScreen() {
       const data = await entriesRepo.getById(entryId);
       if (!data) {
         setStatus('error');
-        setErrorMessage('Entry not found. It may have been deleted.');
+        setErrorMessage(t('entryDetail.errorNotFound'));
         setEntry(null);
         return;
       }
@@ -75,10 +105,10 @@ export default function EntryDetailScreen() {
       setStatus('ready');
     } catch (error) {
       setStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to load entry.');
+      setErrorMessage(error instanceof Error ? error.message : t('entryDetail.errorLoadFailedFallback'));
       setEntry(null);
     }
-  }, [entryId]);
+  }, [entryId, t]);
 
   useEffect(() => {
     if (!isFocused) {
@@ -93,10 +123,10 @@ export default function EntryDetailScreen() {
       return;
     }
 
-    Alert.alert('Delete entry?', 'This removes the entry from local history and export results.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('entryDetail.deleteTitle'), t('entryDetail.deleteMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('entryDetail.deleteAction'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
@@ -105,7 +135,7 @@ export default function EntryDetailScreen() {
               await entriesRepo.delete(entry.id);
               router.back();
             } catch (error) {
-              Alert.alert('Could not delete entry', error instanceof Error ? error.message : 'Unexpected error.');
+              Alert.alert(t('entryDetail.deleteFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
             } finally {
               setDeleting(false);
             }
@@ -122,7 +152,7 @@ export default function EntryDetailScreen() {
 
     const supported = await Linking.canOpenURL(entry.receiptUri);
     if (!supported) {
-      Alert.alert('Cannot open receipt', 'No app can open this file on your device.');
+      Alert.alert(t('entryDetail.receiptOpenFailedTitle'), t('entryDetail.receiptOpenFailedMessage'));
       return;
     }
 
@@ -136,79 +166,86 @@ export default function EntryDetailScreen() {
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
-          <SectionHeader title="Entry Detail" description={entry ? `Entry ID: ${entry.id}` : 'Loading selected entry.'} />
+          <SectionHeader title={t('entryDetail.title')} description={entry ? t('entryDetail.descriptionLoaded', { id: entry.id }) : t('entryDetail.descriptionLoading')} />
 
           {status === 'loading' ? (
             <Card className="gap-2">
               <ActivityIndicator color={theme.textSecondary} />
-              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Loading entry...</Text>
+              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('entryDetail.loading')}</Text>
             </Card>
           ) : status === 'error' || !entry ? (
             <EmptyState
               tone="destructive"
-              title="Could not load entry"
-              description={errorMessage ?? 'Unexpected error.'}
-              actionLabel="Retry"
+              title={t('entryDetail.errorLoadTitle')}
+              description={errorMessage ?? t('common.unexpectedError')}
+              actionLabel={t('common.retry')}
               onAction={() => void loadEntry()}
             />
           ) : (
             <>
               <Card className="gap-2">
-                <DetailLine label="Type" value={entry.type === 'trip' ? 'Trip' : 'Fuel'} />
-                <DetailLine label="Vehicle" value={entry.vehicleName} />
-                <DetailLine label="Date" value={formatDateTime(entry.occurredAt)} />
+                <DetailLine label={t('entryDetail.field.type')} value={entry.type === 'trip' ? t('entryDetail.typeTrip') : t('entryDetail.typeFuel')} />
+                <DetailLine label={t('entryDetail.field.vehicle')} value={entry.vehicleName} />
+                <DetailLine label={t('entryDetail.field.date')} value={formatDateTime(entry.occurredAt)} />
 
                 {entry.type === 'trip' ? (
                   <>
-                    <DetailLine label="Purpose" value={entry.purpose} />
-                    <DetailLine label="Start Km" value={String(entry.startOdometerKm)} />
-                    <DetailLine label="Current Km" value={String(entry.endOdometerKm)} />
-                    <DetailLine label="Distance" value={`${entry.distanceKm} km`} />
-                    <DetailLine label="Time" value={`${entry.startTime ?? '--:--'} - ${entry.endTime ?? '--:--'}`} />
-                    <DetailLine label="Route" value={`${entry.startLocation ?? 'N/A'} -> ${entry.endLocation ?? 'N/A'}`} />
+                    <DetailLine label={t('entryDetail.field.purpose')} value={entry.purpose} />
+                    <DetailLine label={t('entryDetail.field.startKm')} value={String(entry.startOdometerKm)} />
+                    <DetailLine label={t('entryDetail.field.currentKm')} value={String(entry.endOdometerKm)} />
+                    <DetailLine label={t('entryDetail.field.distance')} value={`${entry.distanceKm} km`} />
+                    <DetailLine label={t('entryDetail.field.time')} value={`${entry.startTime ?? '--:--'} - ${entry.endTime ?? '--:--'}`} />
+                    <DetailLine label={t('entryDetail.field.route')} value={`${entry.startLocation ?? t('common.notAvailable')} -> ${entry.endLocation ?? t('common.notAvailable')}`} />
                     <DetailLine
-                      label="Tag"
-                      value={entry.privateTag === null ? 'unclassified (legacy)' : entry.privateTag}
+                      label={t('entryDetail.field.tag')}
+                      value={
+                        entry.privateTag === null
+                          ? t('entryDetail.unclassifiedLegacy')
+                          : entry.privateTag === 'business'
+                            ? t('common.vehicleWork')
+                            : t('common.vehiclePrivate')
+                      }
                     />
                   </>
                 ) : (
                   <>
-                    <DetailLine label="Liters" value={`${entry.liters.toFixed(2)} L`} />
-                    <DetailLine label="Total Price" value={`EUR ${entry.totalPrice.toFixed(2)}`} />
-                    <DetailLine label="Station" value={entry.station} />
-                    <DetailLine label="Odometer" value={entry.odometerKm !== null ? String(entry.odometerKm) : 'N/A'} />
+                    <DetailLine label={t('entryDetail.field.fuelType')} value={fuelTypeLabel(entry.fuelType, t)} />
+                    <DetailLine label={t('entryDetail.field.liters')} value={`${entry.liters.toFixed(2)} L`} />
+                    <DetailLine label={t('entryDetail.field.totalPrice')} value={`EUR ${entry.totalPrice.toFixed(2)}`} />
+                    <DetailLine label={t('entryDetail.field.station')} value={entry.station} />
+                    <DetailLine label={t('entryDetail.field.odometer')} value={entry.odometerKm !== null ? String(entry.odometerKm) : t('common.notAvailable')} />
                     <DetailLine
-                      label="Avg Consumption"
+                      label={t('entryDetail.field.avgConsumption')}
                       value={
                         entry.avgConsumptionLPer100Km !== null
                           ? `${entry.avgConsumptionLPer100Km.toFixed(2)} L / 100 km`
-                          : 'Not enough data'
+                          : t('entryDetail.notEnoughData')
                       }
                     />
                     <DetailLine
-                      label="Receipt"
+                      label={t('entryDetail.field.receipt')}
                       value={
                         entry.receiptUri ? (
                           <Button
-                            label={entry.receiptName ?? 'Open receipt'}
+                            label={entry.receiptName ?? t('entryDetail.openReceipt')}
                             variant="ghost"
                             size="sm"
                             className="self-start"
                             onPress={() => void openReceipt()}
                           />
                         ) : (
-                          'No receipt attached'
+                          t('entryDetail.noReceipt')
                         )
                       }
                     />
                   </>
                 )}
 
-                <DetailLine label="Notes" value={entry.notes ?? 'No notes.'} />
+                <DetailLine label={t('entryDetail.field.notes')} value={entry.notes ?? t('entryDetail.noNotes')} />
               </Card>
 
               <Button
-                label="Edit Entry"
+                label={t('entryDetail.editAction')}
                 variant="secondary"
                 onPress={() =>
                   router.push({
@@ -219,7 +256,7 @@ export default function EntryDetailScreen() {
               />
 
               <Button
-                label={deleting ? 'Deleting...' : 'Delete Entry'}
+                label={deleting ? t('entryDetail.deleting') : t('entryDetail.deleteAction')}
                 variant="destructive"
                 loading={deleting}
                 disabled={deleting}
