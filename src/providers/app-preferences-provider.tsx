@@ -13,6 +13,7 @@ type AppPreferencesContextValue = {
   resolvedTheme: ResolvedTheme;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
   setLanguage: (language: AppLanguage) => Promise<void>;
+  reloadPreferences: () => Promise<void>;
 };
 
 const defaultPreferences = createDefaultPreferences();
@@ -23,6 +24,7 @@ const AppPreferencesContext = createContext<AppPreferencesContextValue>({
   resolvedTheme: 'light',
   setThemeMode: async () => {},
   setLanguage: async () => {},
+  reloadPreferences: async () => {},
 });
 
 function resolveTheme(mode: ThemeMode, systemScheme: string | null | undefined): ResolvedTheme {
@@ -74,6 +76,13 @@ export function AppPreferencesProvider({ children }: React.PropsWithChildren) {
     [],
   );
 
+  const reloadPreferences = useCallback(async () => {
+    const stored = await loadPreferences();
+    preferencesRef.current = stored;
+    setPreferences(stored);
+    setIsHydrated(true);
+  }, []);
+
   const setThemeMode = useCallback(
     async (mode: ThemeMode) => {
       await updatePreferences((current) => {
@@ -107,8 +116,9 @@ export function AppPreferencesProvider({ children }: React.PropsWithChildren) {
       resolvedTheme: resolveTheme(preferences.themeMode, systemScheme),
       setThemeMode,
       setLanguage,
+      reloadPreferences,
     }),
-    [isHydrated, preferences, setLanguage, setThemeMode, systemScheme],
+    [isHydrated, preferences, reloadPreferences, setLanguage, setThemeMode, systemScheme],
   );
 
   return <AppPreferencesContext.Provider value={value}>{children}</AppPreferencesContext.Provider>;
