@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Card, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, vehiclesRepo } from '@/data/repositories';
+import { useI18n } from '@/hooks/use-i18n';
 
 type DashboardMetricProps = {
   label: string;
@@ -26,6 +27,7 @@ function DashboardMetric({ label, value, helper }: DashboardMetricProps) {
 
 export default function DashboardScreen() {
   const isFocused = useIsFocused();
+  const { t } = useI18n();
   const [carsTracked, setCarsTracked] = useState(0);
   const [tripsThisMonth, setTripsThisMonth] = useState(0);
   const [fuelThisMonth, setFuelThisMonth] = useState(0);
@@ -67,25 +69,27 @@ export default function DashboardScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.content}>
           <SectionHeader
-            title="Dashboard"
-            description="Local-first overview. Drivers are deferred to post-MVP company platform."
+            title={t('dashboard.title')}
+            description={t('dashboard.description')}
           />
 
           {loadError ? (
             <Card tone="warning">
-              <Text className="text-xs text-warning dark:text-dark-warning">Metrics warning: {loadError}</Text>
+              <Text className="text-xs text-warning dark:text-dark-warning">
+                {t('dashboard.metricsWarning', { error: loadError })}
+              </Text>
             </Card>
           ) : null}
 
           <View style={styles.grid}>
             <DashboardMetric
-              label="Cars tracked"
+              label={t('dashboard.carsTracked')}
               value={String(carsTracked)}
-              helper={carsTracked === 0 ? 'Start by adding your first vehicle.' : undefined}
+              helper={carsTracked === 0 ? t('dashboard.carsTrackedHelper') : undefined}
             />
-            <DashboardMetric label="Drivers under you" value="0" helper="Deferred in MVP." />
-            <DashboardMetric label="Trips this month" value={String(tripsThisMonth)} />
-            <DashboardMetric label="Fuel entries this month" value={String(fuelThisMonth)} />
+            <DashboardMetric label={t('dashboard.driversUnderYou')} value="0" helper={t('dashboard.driversDeferred')} />
+            <DashboardMetric label={t('dashboard.tripsThisMonth')} value={String(tripsThisMonth)} />
+            <DashboardMetric label={t('dashboard.fuelEntriesThisMonth')} value={String(fuelThisMonth)} />
           </View>
         </ScrollView>
       </SafeAreaView>

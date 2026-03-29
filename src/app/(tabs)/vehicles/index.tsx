@@ -9,11 +9,12 @@ import { Button, EmptyState, FormField, Input, ListRow, SectionHeader } from '@/
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
 import type { VehicleListItem } from '@/data/types';
+import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 
-function formatDate(iso: string | null) {
+function formatDate(iso: string | null, fallback: string) {
   if (!iso) {
-    return 'No activity yet';
+    return fallback;
   }
 
   const parsed = new Date(iso);
@@ -28,6 +29,7 @@ export default function VehiclesScreen() {
   const router = useRouter();
   const isFocused = useIsFocused();
   const theme = useTheme();
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [vehicles, setVehicles] = useState<VehicleListItem[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -53,9 +55,9 @@ export default function VehiclesScreen() {
       }
 
       setStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to load vehicles.');
+      setErrorMessage(error instanceof Error ? error.message : t('vehicles.errorLoadFailedFallback'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isFocused) {
@@ -70,15 +72,17 @@ export default function VehiclesScreen() {
   const listHeader = useMemo(
     () => (
       <View style={styles.headerSection}>
-        <SectionHeader title="Vehicles" description="Choose a vehicle to manage trips and fuel logs." />
+        <SectionHeader title={t('vehicles.title')} description={t('vehicles.description')} />
 
-        <Button label="Add Vehicle" variant="primary" onPress={() => router.push('/vehicles/new')} className="self-start" />
+        <Button label={t('vehicles.addAction')} variant="primary" onPress={() => router.push('/vehicles/new')} className="self-start" />
 
-        <FormField label="Search Vehicles" hint={`${vehicles.length} result${vehicles.length === 1 ? '' : 's'}`}>
+        <FormField
+          label={t('vehicles.searchLabel')}
+          hint={t('vehicles.searchResultsHint', { count: vehicles.length })}>
           <Input
             value={query}
             onChangeText={setQuery}
-            placeholder="Search by name, plate, make, model, or VIN"
+            placeholder={t('vehicles.searchPlaceholder')}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
@@ -87,7 +91,7 @@ export default function VehiclesScreen() {
         </FormField>
       </View>
     ),
-    [query, router, vehicles.length],
+    [query, router, t, vehicles.length],
   );
 
   return (
@@ -103,21 +107,21 @@ export default function VehiclesScreen() {
             status === 'loading' ? (
               <View style={styles.loadingWrap}>
                 <ActivityIndicator color={theme.textSecondary} />
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Loading vehicles...</Text>
+                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('vehicles.loading')}</Text>
               </View>
             ) : status === 'error' ? (
               <EmptyState
                 tone="destructive"
-                title="Could not load vehicles"
-                description={errorMessage ?? 'Unexpected error.'}
-                actionLabel="Retry"
+                title={t('vehicles.errorLoadTitle')}
+                description={errorMessage ?? t('common.unexpectedError')}
+                actionLabel={t('common.retry')}
                 onAction={() => void loadVehicles(query)}
               />
             ) : (
               <EmptyState
-                title={hasQuery ? 'No vehicles found' : 'No vehicles yet'}
+                title={hasQuery ? t('vehicles.emptySearchTitle') : t('vehicles.emptyTitle')}
                 description={
-                  hasQuery ? 'Try a broader search term.' : 'Create your first vehicle to begin logging trips and fuel.'
+                  hasQuery ? t('vehicles.emptySearchDescription') : t('vehicles.emptyDescription')
                 }
               />
             )
@@ -127,10 +131,19 @@ export default function VehiclesScreen() {
               title={vehicle.name}
               subtitle={
                 vehicle.make || vehicle.model
-                  ? `${[vehicle.make, vehicle.model].filter(Boolean).join(' ')} | ${vehicle.plate} | Trips: ${vehicle.tripCount} | Fuel: ${vehicle.fuelCount}`
-                  : `${vehicle.plate} | Trips: ${vehicle.tripCount} | Fuel: ${vehicle.fuelCount}`
+                  ? t('vehicles.listSubtitleWithSpecs', {
+                      specs: [vehicle.make, vehicle.model].filter(Boolean).join(' '),
+                      plate: vehicle.plate,
+                      tripCount: vehicle.tripCount,
+                      fuelCount: vehicle.fuelCount,
+                    })
+                  : t('vehicles.listSubtitle', {
+                      plate: vehicle.plate,
+                      tripCount: vehicle.tripCount,
+                      fuelCount: vehicle.fuelCount,
+                    })
               }
-              meta={formatDate(vehicle.lastActivityAt)}
+              meta={formatDate(vehicle.lastActivityAt, t('vehicles.noActivityYet'))}
               onPress={() =>
                 router.push({
                   pathname: '/vehicles/[vehicleId]',
