@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 const RECEIPTS_DIR_NAME = 'receipts';
 
-function getReceiptsDirectory() {
+export function getReceiptsDirectoryPath() {
   const baseDir = FileSystem.documentDirectory;
   if (!baseDir) {
     throw new Error('App document directory is unavailable.');
@@ -30,13 +30,40 @@ function inferExtension(sourceUri: string, preferredName?: string | null) {
   return 'bin';
 }
 
+export async function ensureReceiptsDirectory() {
+  const receiptsDir = getReceiptsDirectoryPath();
+  await FileSystem.makeDirectoryAsync(receiptsDir, { intermediates: true });
+  return receiptsDir;
+}
+
+export async function listReceiptFiles(): Promise<string[]> {
+  const receiptsDir = getReceiptsDirectoryPath();
+
+  const dirInfo = await FileSystem.getInfoAsync(receiptsDir);
+  if (!dirInfo.exists) {
+    return [];
+  }
+
+  const names = await FileSystem.readDirectoryAsync(receiptsDir);
+  return names.map((name) => `${receiptsDir}/${name}`);
+}
+
+export async function deleteFileIfExists(uri: string): Promise<boolean> {
+  const info = await FileSystem.getInfoAsync(uri);
+  if (!info.exists) {
+    return false;
+  }
+
+  await FileSystem.deleteAsync(uri, { idempotent: true });
+  return true;
+}
+
 export async function copyReceiptToAppStorage(input: {
   sourceUri: string;
   preferredName?: string | null;
   prefix?: 'receipt_photo' | 'receipt_pdf' | 'receipt_file';
 }) {
-  const receiptsDir = getReceiptsDirectory();
-  await FileSystem.makeDirectoryAsync(receiptsDir, { intermediates: true });
+  const receiptsDir = await ensureReceiptsDirectory();
 
   const extension = inferExtension(input.sourceUri, input.preferredName);
   const prefix = input.prefix ?? 'receipt_file';
