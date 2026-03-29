@@ -1,11 +1,11 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { Button, EmptyState, FormField, Input, ListRow, SectionHeader } from '@/components/ui';
+import { AppText, Button, EmptyState, FormField, Input, ListRow, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
 import type { VehicleListItem } from '@/data/types';
@@ -107,7 +107,7 @@ export default function VehiclesScreen() {
             status === 'loading' ? (
               <View style={styles.loadingWrap}>
                 <ActivityIndicator color={theme.textSecondary} />
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('vehicles.loading')}</Text>
+                <AppText variant="caption" color="secondary">{t('vehicles.loading')}</AppText>
               </View>
             ) : status === 'error' ? (
               <EmptyState

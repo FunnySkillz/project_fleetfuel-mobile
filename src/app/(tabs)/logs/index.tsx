@@ -1,7 +1,7 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
@@ -15,6 +15,7 @@ import {
   ListRow,
   SectionHeader,
   SelectField,
+  AppText,
 } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { logsRepo, vehiclesRepo } from '@/data/repositories';
@@ -482,28 +483,28 @@ export default function LogsScreen() {
             </FormField>
 
             <Card variant="outline" className="gap-1.5">
-              <Text className="text-sm font-semibold text-text dark:text-dark-text">{t('logs.preview.title')}</Text>
+              <AppText variant="label">{t('logs.preview.title')}</AppText>
               {previewStatus === 'loading' ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator color={theme.textSecondary} />
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.calculating')}</Text>
+                  <AppText variant="caption" color="secondary">{t('logs.preview.calculating')}</AppText>
                 </View>
               ) : previewStatus === 'error' || !preview ? (
-                <Text className="text-xs text-destructive dark:text-dark-destructive">
+                <AppText variant="caption" color="destructive">
                   {previewError ?? t('logs.preview.errorFallback')}
-                </Text>
+                </AppText>
               ) : (
                 <View style={styles.previewGrid}>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.vehicleCount', { value: preview.vehicleCount })}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.tripCount', { value: preview.tripCount })}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.fuelCount', { value: preview.fuelCount })}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.totalDistance', { value: preview.totalDistanceKm })}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.workDistance', { value: preview.businessDistanceKm })}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.privateDistance', { value: preview.privateDistanceKm })}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.unclassifiedDistance', { value: preview.unclassifiedDistanceKm })}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
+                  <AppText variant="caption" color="secondary">{t('logs.preview.vehicleCount', { value: preview.vehicleCount })}</AppText>
+                  <AppText variant="caption" color="secondary">{t('logs.preview.tripCount', { value: preview.tripCount })}</AppText>
+                  <AppText variant="caption" color="secondary">{t('logs.preview.fuelCount', { value: preview.fuelCount })}</AppText>
+                  <AppText variant="caption" color="secondary">{t('logs.preview.totalDistance', { value: preview.totalDistanceKm })}</AppText>
+                  <AppText variant="caption" color="secondary">{t('logs.preview.workDistance', { value: preview.businessDistanceKm })}</AppText>
+                  <AppText variant="caption" color="secondary">{t('logs.preview.privateDistance', { value: preview.privateDistanceKm })}</AppText>
+                  <AppText variant="caption" color="secondary">{t('logs.preview.unclassifiedDistance', { value: preview.unclassifiedDistanceKm })}</AppText>
+                  <AppText variant="caption" color="secondary">
                     {t('logs.preview.fuelSpend', { value: preview.fuelSpendTotal.toFixed(2) })}
-                  </Text>
+                  </AppText>
                 </View>
               )}
             </Card>
@@ -540,12 +541,12 @@ export default function LogsScreen() {
                 {timelineStatus === 'loading' ? (
                   <View style={styles.loadingRow}>
                     <ActivityIndicator color={theme.textSecondary} />
-                    <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.timeline.loading')}</Text>
+                    <AppText variant="caption" color="secondary">{t('logs.timeline.loading')}</AppText>
                   </View>
                 ) : timelineStatus === 'error' ? (
-                  <Text className="text-xs text-destructive dark:text-dark-destructive">
+                  <AppText variant="caption" color="destructive">
                     {timelineError ?? t('logs.timeline.errorFallback')}
-                  </Text>
+                  </AppText>
                 ) : timelineEntries.length === 0 ? (
                   <EmptyState title={t('logs.timeline.emptyTitle')} description={t('logs.timeline.emptyDescription')} />
                 ) : (
@@ -566,17 +567,17 @@ export default function LogsScreen() {
                 )}
               </>
             ) : (
-              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
+              <AppText variant="caption" color="secondary">
                 {t('logs.timeline.hiddenHint')}
-              </Text>
+              </AppText>
             )}
           </Card>
 
           {vehiclesStatus === 'error' ? (
             <Card tone="warning">
-              <Text className="text-xs text-warning dark:text-dark-warning">
+              <AppText variant="caption" color="warning">
                 {t('logs.warning.vehiclesLoad')}
-              </Text>
+              </AppText>
             </Card>
           ) : null}
         </ScrollView>

@@ -1,11 +1,13 @@
 import React from 'react';
-import { Text, View, type ViewProps } from 'react-native';
+import { View, type ViewProps } from 'react-native';
 
+import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/cn';
 
+import { AppText } from './app-text';
 import { Button } from './button';
 import { Card } from './card';
-import { type SemanticTone, toneMutedTextClass, toneTextClass } from './tone';
+import { type SemanticTone, toneMutedTextColor, toneTextColor } from './tone';
 
 type EmptyStateProps = ViewProps & {
   title: string;
@@ -27,10 +29,20 @@ export function EmptyState({
   className,
   ...props
 }: EmptyStateProps) {
+  const theme = useTheme();
+  const titleColor = toneTextColor(theme, tone);
+  const mutedColor = toneMutedTextColor(theme, tone);
+
   return (
     <Card tone={tone} className={cn('gap-2', className)} {...props}>
-      <Text className={cn('text-sm font-semibold', toneTextClass[tone])}>{title}</Text>
-      {description ? <Text className={cn('text-xs', toneMutedTextClass[tone])}>{description}</Text> : null}
+      <AppText variant="label" style={{ color: titleColor }}>
+        {title}
+      </AppText>
+      {description ? (
+        <AppText variant="caption" style={{ color: mutedColor }}>
+          {description}
+        </AppText>
+      ) : null}
       {actionLabel && onAction ? (
         <View className="pt-1">
           <Button

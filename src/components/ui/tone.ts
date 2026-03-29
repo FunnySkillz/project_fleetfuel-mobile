@@ -1,22 +1,33 @@
+import { Colors } from '@/constants/theme';
+
 export type SemanticTone = 'neutral' | 'success' | 'warning' | 'destructive';
 
-export const toneTextClass: Record<SemanticTone, string> = {
-  neutral: 'text-text dark:text-dark-text',
-  success: 'text-success dark:text-dark-success',
-  warning: 'text-warning dark:text-dark-warning',
-  destructive: 'text-destructive dark:text-dark-destructive',
-};
+type AppThemeColorKey = keyof (typeof Colors)['light'];
+export type AppThemeColors = Record<AppThemeColorKey, string>;
 
-export const toneMutedTextClass: Record<SemanticTone, string> = {
-  neutral: 'text-textSecondary dark:text-dark-textSecondary',
-  success: 'text-success dark:text-dark-success',
-  warning: 'text-warning dark:text-dark-warning',
-  destructive: 'text-destructive dark:text-dark-destructive',
-};
+export function toneTextColor(theme: AppThemeColors, tone: SemanticTone): string {
+  if (tone === 'success') {
+    return theme.success;
+  }
+  if (tone === 'warning') {
+    return theme.warning;
+  }
+  if (tone === 'destructive') {
+    return theme.destructive;
+  }
+  return theme.text;
+}
 
-export const toneBorderClass: Record<SemanticTone, string> = {
-  neutral: 'border-surface dark:border-dark-surface',
-  success: 'border-success dark:border-dark-success',
-  warning: 'border-warning dark:border-dark-warning',
-  destructive: 'border-destructive dark:border-dark-destructive',
-};
+export function toneMutedTextColor(theme: AppThemeColors, tone: SemanticTone): string {
+  if (tone === 'neutral') {
+    return theme.textSecondary;
+  }
+  return toneTextColor(theme, tone);
+}
+
+export function toneBorderColor(theme: AppThemeColors, tone: SemanticTone): string {
+  if (tone === 'neutral') {
+    return theme.backgroundSelected;
+  }
+  return toneTextColor(theme, tone);
+}

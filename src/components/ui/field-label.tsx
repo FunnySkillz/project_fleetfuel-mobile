@@ -1,9 +1,11 @@
 import React from 'react';
-import { Text, type TextProps } from 'react-native';
+import { type TextProps } from 'react-native';
 
+import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/cn';
 
-import { type SemanticTone, toneTextClass } from './tone';
+import { AppText } from './app-text';
+import { type SemanticTone, toneTextColor } from './tone';
 
 type FieldLabelProps = TextProps & {
   required?: boolean;
@@ -11,11 +13,22 @@ type FieldLabelProps = TextProps & {
   className?: string;
 };
 
-export function FieldLabel({ children, required = false, tone = 'neutral', className, ...props }: FieldLabelProps) {
+export function FieldLabel({ children, required = false, tone = 'neutral', className, style, ...props }: FieldLabelProps) {
+  const theme = useTheme();
+
   return (
-    <Text className={cn('text-sm font-semibold', toneTextClass[tone], className)} {...props}>
+    <AppText
+      variant="label"
+      className={cn(className)}
+      style={[{ color: toneTextColor(theme, tone) }, style]}
+      {...props}>
       {children}
-      {required ? <Text className="text-destructive dark:text-dark-destructive"> *</Text> : null}
-    </Text>
+      {required ? (
+        <AppText variant="label" color="destructive">
+          {' '}
+          *
+        </AppText>
+      ) : null}
+    </AppText>
   );
 }

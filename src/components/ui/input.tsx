@@ -5,36 +5,33 @@ import { TextInput, type TextInputProps } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/cn';
 
-import { type SemanticTone, toneBorderClass } from './tone';
+import { type SemanticTone, toneBorderColor } from './tone';
 
-const inputVariants = cva(
-  'rounded-xl border text-base text-text dark:text-dark-text',
-  {
-    variants: {
-      variant: {
-        default: 'bg-background dark:bg-dark-background',
-        subtle: 'bg-surface dark:bg-dark-surface',
-        ghost: 'bg-transparent',
-      },
-      size: {
-        sm: 'px-3 py-2 text-sm',
-        default: 'px-4 py-3',
-        lg: 'px-4 py-3.5 text-base',
-      },
-      tone: {
-        neutral: '',
-        success: '',
-        warning: '',
-        destructive: '',
-      },
+const inputVariants = cva('rounded-xl border text-base', {
+  variants: {
+    variant: {
+      default: '',
+      subtle: '',
+      ghost: 'bg-transparent',
     },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-      tone: 'neutral',
+    size: {
+      sm: 'px-3 py-2 text-sm',
+      default: 'px-4 py-3',
+      lg: 'px-4 py-3.5 text-base',
+    },
+    tone: {
+      neutral: '',
+      success: '',
+      warning: '',
+      destructive: '',
     },
   },
-);
+  defaultVariants: {
+    variant: 'default',
+    size: 'default',
+    tone: 'neutral',
+  },
+});
 
 type InputProps = TextInputProps &
   VariantProps<typeof inputVariants> & {
@@ -44,9 +41,22 @@ type InputProps = TextInputProps &
     disabled?: boolean;
   };
 
-export function Input({ className, variant, size, tone = 'neutral', disabled, loading = false, editable, ...props }: InputProps) {
+export function Input({
+  className,
+  variant,
+  size,
+  tone = 'neutral',
+  disabled,
+  loading = false,
+  editable,
+  style,
+  ...props
+}: InputProps) {
   const theme = useTheme();
   const isDisabled = disabled || loading || editable === false;
+  const borderColor = toneBorderColor(theme, tone);
+  const backgroundColor =
+    variant === 'subtle' ? theme.backgroundElement : variant === 'ghost' ? 'transparent' : theme.background;
 
   return (
     <TextInput
@@ -54,10 +64,10 @@ export function Input({ className, variant, size, tone = 'neutral', disabled, lo
       editable={!isDisabled}
       className={cn(
         inputVariants({ variant, size, tone }),
-        toneBorderClass[tone],
         isDisabled && 'opacity-60',
         className,
       )}
+      style={[{ color: theme.text, backgroundColor, borderColor }, style]}
       {...props}
     />
   );

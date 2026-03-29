@@ -2,11 +2,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ThemedView } from '@/components/themed-view';
-import { Button, Card } from '@/components/ui';
+import { AppText, Button, Card } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { checkDatabaseHealth } from '@/data/db';
 import { useI18n } from '@/hooks/use-i18n';
@@ -160,16 +160,16 @@ function RecoveryGate({ isLoading, error, recovering, onRetry, onRestore }: Reco
     <ThemedView style={styles.recoveryContainer}>
       <View style={styles.recoveryContent}>
         <Card className="gap-2">
-          <Text className="text-base font-semibold text-text dark:text-dark-text">{t('recovery.title')}</Text>
+          <AppText variant="subtitle">{t('recovery.title')}</AppText>
           {isLoading ? (
             <View style={styles.loadingRow}>
               <ActivityIndicator />
-              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('recovery.checking')}</Text>
+              <AppText variant="caption" color="secondary">{t('recovery.checking')}</AppText>
             </View>
           ) : (
-            <Text className="text-xs text-destructive dark:text-dark-destructive">
+            <AppText variant="caption" color="destructive">
               {error ?? t('recovery.errorFallback')}
-            </Text>
+            </AppText>
           )}
 
           <Button

@@ -1,16 +1,24 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React, { type ReactNode } from 'react';
-import { Pressable, Text, View, type PressableProps } from 'react-native';
+import {
+  Pressable,
+  View,
+  type PressableProps,
+  type PressableStateCallbackType,
+  type ViewStyle,
+} from 'react-native';
 
+import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/cn';
 
-import { type SemanticTone, toneBorderClass, toneMutedTextClass, toneTextClass } from './tone';
+import { AppText } from './app-text';
+import { type SemanticTone, toneBorderColor, toneMutedTextColor, toneTextColor } from './tone';
 
 const rowVariants = cva('rounded-xl border active:opacity-80', {
   variants: {
     variant: {
-      elevated: 'bg-surface dark:bg-dark-surface',
-      outline: 'bg-background dark:bg-dark-background',
+      elevated: '',
+      outline: '',
       ghost: 'border-transparent bg-transparent',
     },
     size: {
@@ -61,31 +69,68 @@ export function ListRow({
   titleClassName,
   subtitleClassName,
   metaClassName,
+  style,
   ...props
 }: ListRowProps) {
+  const theme = useTheme();
   const isDisabled = disabled || loading;
+  const borderColor = toneBorderColor(theme, tone);
+  const backgroundColor =
+    variant === 'ghost'
+      ? 'transparent'
+      : variant === 'outline'
+        ? theme.background
+        : theme.backgroundElement;
+  const titleColor = toneTextColor(theme, tone);
+  const mutedColor = toneMutedTextColor(theme, tone);
+  const baseStyle: ViewStyle = { borderColor, backgroundColor };
+  const mergedStyle = (pressableState: PressableStateCallbackType) => {
+    const computedStyle = typeof style === 'function' ? style(pressableState) : style;
+    return [baseStyle, computedStyle as ViewStyle | undefined];
+  };
 
   return (
     <Pressable
       className={cn(
         rowVariants({ variant, size, tone }),
-        toneBorderClass[tone],
         isDisabled && 'opacity-45',
         className,
       )}
+      style={mergedStyle}
       disabled={isDisabled}
       accessibilityState={{ ...(props.accessibilityState ?? {}), disabled: isDisabled }}
       {...props}>
       <View className="flex-row items-center justify-between gap-3">
         <View className="flex-1 gap-0.5">
-          <Text className={cn('text-sm font-semibold', toneTextClass[tone], titleClassName)}>{title}</Text>
+          <AppText
+            variant="label"
+            className={titleClassName}
+            style={{ color: titleColor }}>
+            {title}
+          </AppText>
           {subtitle ? (
-            <Text className={cn('text-xs', toneMutedTextClass[tone], subtitleClassName)}>{subtitle}</Text>
+            <AppText
+              variant="caption"
+              className={subtitleClassName}
+              style={{ color: mutedColor }}>
+              {subtitle}
+            </AppText>
           ) : null}
         </View>
         <View className="items-end gap-0.5">
-          {meta ? <Text className={cn('text-xs', toneMutedTextClass[tone], metaClassName)}>{meta}</Text> : null}
-          {trailing ?? <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{'>'}</Text>}
+          {meta ? (
+            <AppText
+              variant="caption"
+              className={metaClassName}
+              style={{ color: mutedColor }}>
+              {meta}
+            </AppText>
+          ) : null}
+          {trailing ?? (
+            <AppText variant="caption" color="secondary">
+              {'>'}
+            </AppText>
+          )}
         </View>
       </View>
     </Pressable>

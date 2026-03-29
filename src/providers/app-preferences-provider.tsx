@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createDefaultPreferences } from '@/preferences/defaults';
@@ -37,6 +38,7 @@ function resolveTheme(mode: ThemeMode, systemScheme: string | null | undefined):
 
 export function AppPreferencesProvider({ children }: React.PropsWithChildren) {
   const systemScheme = useColorScheme();
+  const { setColorScheme } = useNativeWindColorScheme();
   const [preferences, setPreferences] = useState<AppPreferences>(defaultPreferences);
   const [isHydrated, setIsHydrated] = useState(false);
   const preferencesRef = useRef<AppPreferences>(defaultPreferences);
@@ -61,6 +63,10 @@ export function AppPreferencesProvider({ children }: React.PropsWithChildren) {
   useEffect(() => {
     preferencesRef.current = preferences;
   }, [preferences]);
+
+  useEffect(() => {
+    setColorScheme(preferences.themeMode);
+  }, [preferences.themeMode, setColorScheme]);
 
   const updatePreferences = useCallback(
     async (updater: (current: AppPreferences) => AppPreferences) => {

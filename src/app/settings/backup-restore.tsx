@@ -1,11 +1,11 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { Button, Card, SectionHeader } from '@/components/ui';
+import { AppText, Button, Card, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useAppPreferences } from '@/hooks/use-app-preferences';
 import { useI18n } from '@/hooks/use-i18n';
@@ -197,9 +197,9 @@ export default function BackupRestoreScreen() {
 
             {lastBackup ? (
               <Card variant="subtle" className="gap-1">
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('backup.lastCreatedLabel')}</Text>
-                <Text className="text-sm font-semibold text-text dark:text-dark-text">{lastBackup.fileName}</Text>
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{lastBackup.uri}</Text>
+                <AppText variant="caption" color="secondary">{t('backup.lastCreatedLabel')}</AppText>
+                <AppText variant="label">{lastBackup.fileName}</AppText>
+                <AppText variant="caption" color="secondary">{lastBackup.uri}</AppText>
               </Card>
             ) : null}
           </Card>
@@ -227,26 +227,26 @@ export default function BackupRestoreScreen() {
             {cleanupReport ? (
               <Card variant="subtle" className="gap-1.5">
                 <View style={styles.kpiRow}>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('backup.scanReferenced')}</Text>
-                  <Text className="text-xs font-semibold text-text dark:text-dark-text">{cleanupReport.referencedCount}</Text>
+                  <AppText variant="caption" color="secondary">{t('backup.scanReferenced')}</AppText>
+                  <AppText variant="label" className="text-xs">{cleanupReport.referencedCount}</AppText>
                 </View>
                 <View style={styles.kpiRow}>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('backup.scanOrphans')}</Text>
-                  <Text className="text-xs font-semibold text-text dark:text-dark-text">{cleanupReport.orphanCount}</Text>
+                  <AppText variant="caption" color="secondary">{t('backup.scanOrphans')}</AppText>
+                  <AppText variant="label" className="text-xs">{cleanupReport.orphanCount}</AppText>
                 </View>
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{cleanupReport.scanTimestamp}</Text>
+                <AppText variant="caption" color="secondary">{cleanupReport.scanTimestamp}</AppText>
 
                 {cleanupReport.orphanFiles.length > 0 ? (
                   <View style={styles.listWrap}>
                     {cleanupReport.orphanFiles.slice(0, 20).map((file) => (
-                      <Text key={file} className="text-[11px] text-textSecondary dark:text-dark-textSecondary">
+                      <AppText key={file} variant="caption" className="text-[11px]" color="secondary">
                         {file}
-                      </Text>
+                      </AppText>
                     ))}
                     {cleanupReport.orphanFiles.length > 20 ? (
-                      <Text className="text-[11px] text-textSecondary dark:text-dark-textSecondary">
+                      <AppText variant="caption" className="text-[11px]" color="secondary">
                         {t('backup.moreFilesHint', { count: cleanupReport.orphanFiles.length - 20 })}
-                      </Text>
+                      </AppText>
                     ) : null}
                   </View>
                 ) : null}

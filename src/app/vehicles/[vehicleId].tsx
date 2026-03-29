@@ -1,11 +1,11 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { Button, Card, EmptyState, ListRow, SectionHeader } from '@/components/ui';
+import { AppText, Button, Card, EmptyState, ListRow, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
 import type { VehicleInsightSummary, VehicleUsageSplitPoint } from '@/data/types';
@@ -56,9 +56,9 @@ type KpiCardProps = {
 function KpiCard({ label, value, helper }: KpiCardProps) {
   return (
     <Card className="w-[48%] gap-1 p-3">
-      <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{label}</Text>
-      <Text className="text-xl font-semibold text-text dark:text-dark-text">{value}</Text>
-      {helper ? <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{helper}</Text> : null}
+      <AppText variant="caption" color="secondary">{label}</AppText>
+      <AppText variant="subtitle" className="text-xl">{value}</AppText>
+      {helper ? <AppText variant="caption" color="secondary">{helper}</AppText> : null}
     </Card>
   );
 }
@@ -165,7 +165,7 @@ export default function VehicleDetailScreen() {
           {status === 'loading' ? (
             <Card className="gap-2">
               <ActivityIndicator color={theme.textSecondary} />
-              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('vehicleDetail.loading')}</Text>
+              <AppText variant="caption" color="secondary">{t('vehicleDetail.loading')}</AppText>
             </Card>
           ) : status === 'error' || !summary ? (
             <EmptyState
@@ -183,15 +183,15 @@ export default function VehicleDetailScreen() {
               />
 
               <Card className="gap-1.5">
-                <Text className="text-sm font-semibold text-text dark:text-dark-text">{t('vehicleDetail.identityTitle')}</Text>
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('vehicleDetail.vinLabel', { value: summary.vehicle.vin ?? '-' })}</Text>
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('vehicleDetail.engineCodeLabel', { value: summary.vehicle.engineTypeCode ?? '-' })}</Text>
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
+                <AppText variant="label">{t('vehicleDetail.identityTitle')}</AppText>
+                <AppText variant="caption" color="secondary">{t('vehicleDetail.vinLabel', { value: summary.vehicle.vin ?? '-' })}</AppText>
+                <AppText variant="caption" color="secondary">{t('vehicleDetail.engineCodeLabel', { value: summary.vehicle.engineTypeCode ?? '-' })}</AppText>
+                <AppText variant="caption" color="secondary">
                   {t('vehicleDetail.powerLabel', { ps: summary.vehicle.ps ?? '-', kw: summary.vehicle.kw ?? '-' })}
-                </Text>
-                <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
+                </AppText>
+                <AppText variant="caption" color="secondary">
                   {t('vehicleDetail.displacementLabel', { value: summary.vehicle.engineDisplacementCc ?? '-' })}
-                </Text>
+                </AppText>
               </Card>
 
               <View style={styles.kpiGrid}>
@@ -211,13 +211,13 @@ export default function VehicleDetailScreen() {
               </View>
 
               <Card className="gap-2">
-                <Text className="text-sm font-semibold text-text dark:text-dark-text">{t('vehicleDetail.monthlyDistanceTitle')}</Text>
+                <AppText variant="label">{t('vehicleDetail.monthlyDistanceTitle')}</AppText>
                 <View style={styles.chartRows}>
                   {summary.monthlyDistance.map((point) => {
                     const widthPercent = Math.max(4, Math.round((point.distanceKm / monthlyMax) * 100));
                     return (
                       <View key={point.monthKey} style={styles.chartRow}>
-                        <Text className="w-16 text-xs text-textSecondary dark:text-dark-textSecondary">{point.monthLabel}</Text>
+                        <AppText className="w-16" variant="caption" color="secondary">{point.monthLabel}</AppText>
                         <View style={[styles.chartTrack, { backgroundColor: theme.backgroundSelected }]}>
                           <View
                             style={[
@@ -229,9 +229,9 @@ export default function VehicleDetailScreen() {
                             ]}
                           />
                         </View>
-                        <Text className="w-20 text-right text-xs text-textSecondary dark:text-dark-textSecondary">
+                        <AppText className="w-20 text-right" variant="caption" color="secondary">
                           {point.distanceKm} km
-                        </Text>
+                        </AppText>
                       </View>
                     );
                   })}
@@ -239,13 +239,13 @@ export default function VehicleDetailScreen() {
               </Card>
 
               <Card className="gap-2">
-                <Text className="text-sm font-semibold text-text dark:text-dark-text">{t('vehicleDetail.usageSplitTitle')}</Text>
+                <AppText variant="label">{t('vehicleDetail.usageSplitTitle')}</AppText>
                 <View style={styles.chartRows}>
                   {summary.usageSplit.map((item) => {
                     const widthPercent = Math.max(4, Math.round(item.ratio * 100));
                     return (
                       <View key={item.key} style={styles.chartRow}>
-                        <Text className="w-16 text-xs text-textSecondary dark:text-dark-textSecondary">{item.label}</Text>
+                        <AppText className="w-16" variant="caption" color="secondary">{item.label}</AppText>
                         <View style={[styles.chartTrack, { backgroundColor: theme.backgroundSelected }]}>
                           <View
                             style={[
@@ -257,9 +257,9 @@ export default function VehicleDetailScreen() {
                             ]}
                           />
                         </View>
-                        <Text className="w-20 text-right text-xs text-textSecondary dark:text-dark-textSecondary">
+                        <AppText className="w-20 text-right" variant="caption" color="secondary">
                           {item.distanceKm} km
-                        </Text>
+                        </AppText>
                       </View>
                     );
                   })}

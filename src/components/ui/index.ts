@@ -1,4 +1,5 @@
 export { ActionRow } from './action-row';
+export { AppText } from './app-text';
 export { Button } from './button';
 export { Card } from './card';
 export { Chip } from './chip';

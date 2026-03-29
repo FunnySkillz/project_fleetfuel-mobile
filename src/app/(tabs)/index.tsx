@@ -1,10 +1,10 @@
 import { useIsFocused } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { Card, SectionHeader } from '@/components/ui';
+import { AppText, Card, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, vehiclesRepo } from '@/data/repositories';
 import { useI18n } from '@/hooks/use-i18n';
@@ -18,9 +18,9 @@ type DashboardMetricProps = {
 function DashboardMetric({ label, value, helper }: DashboardMetricProps) {
   return (
     <Card className="gap-1">
-      <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{label}</Text>
-      <Text className="text-2xl font-semibold text-text dark:text-dark-text">{value}</Text>
-      {helper ? <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{helper}</Text> : null}
+      <AppText variant="caption" color="secondary">{label}</AppText>
+      <AppText variant="title" className="text-2xl">{value}</AppText>
+      {helper ? <AppText variant="caption" color="secondary">{helper}</AppText> : null}
     </Card>
   );
 }
@@ -75,9 +75,9 @@ export default function DashboardScreen() {
 
           {loadError ? (
             <Card tone="warning">
-              <Text className="text-xs text-warning dark:text-dark-warning">
+              <AppText variant="caption" color="warning">
                 {t('dashboard.metricsWarning', { error: loadError })}
-              </Text>
+              </AppText>
             </Card>
           ) : null}
 

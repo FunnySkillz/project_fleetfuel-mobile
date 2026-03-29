@@ -1,7 +1,7 @@
 import React from 'react';
-import { Text, type TextProps } from 'react-native';
+import { type TextProps } from 'react-native';
 
-import { cn } from '@/lib/cn';
+import { AppText } from './app-text';
 
 type FieldErrorProps = TextProps & {
   className?: string;
@@ -13,8 +13,8 @@ export function FieldError({ children, className, ...props }: FieldErrorProps) {
   }
 
   return (
-    <Text className={cn('text-xs text-destructive dark:text-dark-destructive', className)} {...props}>
+    <AppText variant="caption" color="destructive" className={className} {...props}>
       {children}
-    </Text>
+    </AppText>
   );
 }

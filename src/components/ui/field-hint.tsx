@@ -1,19 +1,27 @@
 import React from 'react';
-import { Text, type TextProps } from 'react-native';
+import { type TextProps } from 'react-native';
 
+import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/cn';
 
-import { type SemanticTone, toneMutedTextClass } from './tone';
+import { AppText } from './app-text';
+import { type SemanticTone, toneMutedTextColor } from './tone';
 
 type FieldHintProps = TextProps & {
   tone?: SemanticTone;
   className?: string;
 };
 
-export function FieldHint({ children, tone = 'neutral', className, ...props }: FieldHintProps) {
+export function FieldHint({ children, tone = 'neutral', className, style, ...props }: FieldHintProps) {
+  const theme = useTheme();
+
   return (
-    <Text className={cn('text-xs', toneMutedTextClass[tone], className)} {...props}>
+    <AppText
+      variant="caption"
+      className={cn(className)}
+      style={[{ color: toneMutedTextColor(theme, tone) }, style]}
+      {...props}>
       {children}
-    </Text>
+    </AppText>
   );
 }

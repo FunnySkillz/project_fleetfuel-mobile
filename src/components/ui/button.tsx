@@ -1,21 +1,28 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
-import { ActivityIndicator, Pressable, type PressableProps, Text, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  type PressableProps,
+  type PressableStateCallbackType,
+  type ViewStyle,
+} from 'react-native';
 
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/cn';
 
-import { type SemanticTone, toneBorderClass } from './tone';
+import { AppText } from './app-text';
+import { type SemanticTone, toneBorderColor, toneTextColor } from './tone';
 
 const buttonVariants = cva(
-  'flex-row items-center justify-center rounded-xl active:opacity-80 disabled:opacity-45',
+  'flex-row items-center justify-center rounded-xl active:opacity-80 disabled:opacity-45 border',
   {
     variants: {
       variant: {
-        primary: 'bg-accent dark:bg-dark-accent',
-        secondary: 'bg-surface dark:bg-dark-surface',
-        destructive: 'bg-destructive dark:bg-dark-destructive',
-        ghost: 'border bg-transparent',
+        primary: '',
+        secondary: '',
+        destructive: '',
+        ghost: 'bg-transparent',
       },
       size: {
         default: 'min-h-11 px-4 py-3',
@@ -36,20 +43,6 @@ const buttonVariants = cva(
     },
   },
 );
-
-const labelVariants = cva('text-sm font-semibold', {
-  variants: {
-    variant: {
-      primary: 'text-white',
-      secondary: 'text-text dark:text-dark-text',
-      destructive: 'text-white',
-      ghost: 'text-text dark:text-dark-text',
-    },
-  },
-  defaultVariants: {
-    variant: 'secondary',
-  },
-});
 
 type ButtonProps = PressableProps &
   VariantProps<typeof buttonVariants> & {
@@ -76,24 +69,50 @@ export function Button({
 }: ButtonProps) {
   const theme = useTheme();
   const isDisabled = disabled || loading;
-  const indicatorColor =
-    variant === 'primary' || variant === 'destructive' ? theme.background : theme.text;
-  const toneBorder = variant === 'ghost' ? toneBorderClass[tone] : tone !== 'neutral' ? toneBorderClass[tone] : '';
+  const semanticTone = variant === 'destructive' ? 'destructive' : tone;
+  const toneBorder = toneBorderColor(theme, semanticTone);
+  const toneText = toneTextColor(theme, semanticTone);
 
-  const mergedStyle = typeof style === 'function' ? style : ({ pressed }: { pressed: boolean }) =>
-    [style as ViewStyle | undefined, pressed && !isDisabled ? { opacity: 0.88 } : undefined];
+  const backgroundColor =
+    variant === 'primary'
+      ? theme.accent
+      : variant === 'destructive'
+        ? theme.destructive
+        : variant === 'secondary'
+          ? theme.backgroundElement
+          : 'transparent';
+
+  const borderColor =
+    variant === 'primary'
+      ? theme.accent
+      : variant === 'destructive'
+        ? theme.destructive
+        : toneBorder;
+
+  const labelColor = variant === 'primary' || variant === 'destructive' ? theme.background : toneText;
+  const indicatorColor = labelColor;
+  const baseStyle: ViewStyle = { backgroundColor, borderColor };
+
+  const mergedStyle = (pressableState: PressableStateCallbackType) => {
+    const { pressed } = pressableState;
+    const computedStyle = typeof style === 'function' ? style(pressableState) : style;
+    return [baseStyle, computedStyle as ViewStyle | undefined, pressed && !isDisabled ? { opacity: 0.88 } : undefined];
+  };
 
   return (
     <Pressable
-      className={cn(buttonVariants({ variant, size, tone }), toneBorder, isDisabled && 'opacity-45', className)}
+      className={cn(buttonVariants({ variant, size, tone }), isDisabled && 'opacity-45', className)}
       disabled={isDisabled}
       accessibilityState={{ ...(props.accessibilityState ?? {}), disabled: isDisabled }}
       style={mergedStyle}
       {...props}>
       {loading ? <ActivityIndicator color={indicatorColor} size="small" /> : null}
-      <Text className={cn(labelVariants({ variant }), loading && 'ml-2', textClassName)}>
+      <AppText
+        variant="label"
+        className={cn(loading && 'ml-2', textClassName)}
+        style={{ color: labelColor }}>
         {loading ? loadingLabel ?? label : label}
-      </Text>
+      </AppText>
     </Pressable>
   );
 }

@@ -2,16 +2,17 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 import { View, type ViewProps } from 'react-native';
 
+import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/cn';
 
-import { type SemanticTone, toneBorderClass } from './tone';
+import { type SemanticTone, toneBorderColor } from './tone';
 
-const cardVariants = cva('rounded-2xl border p-4', {
+const cardVariants = cva('rounded-2xl border', {
   variants: {
     variant: {
-      elevated: 'bg-surface dark:bg-dark-surface',
-      subtle: 'border-transparent bg-surface dark:bg-dark-surface',
-      outline: 'bg-background dark:bg-dark-background',
+      elevated: '',
+      subtle: '',
+      outline: '',
     },
     size: {
       sm: 'p-3',
@@ -35,9 +36,25 @@ const cardVariants = cva('rounded-2xl border p-4', {
 type CardProps = ViewProps &
   VariantProps<typeof cardVariants> & {
     tone?: SemanticTone;
-  className?: string;
-};
+    className?: string;
+  };
 
-export function Card({ className, variant, size, tone = 'neutral', ...props }: CardProps) {
-  return <View className={cn(cardVariants({ variant, size, tone }), toneBorderClass[tone], className)} {...props} />;
+export function Card({ className, variant, size, tone = 'neutral', style, ...props }: CardProps) {
+  const theme = useTheme();
+  const toneBorder = toneBorderColor(theme, tone);
+  const surfaceColor =
+    variant === 'subtle'
+      ? theme.backgroundSelected
+      : variant === 'outline'
+        ? theme.background
+        : theme.backgroundElement;
+  const borderColor = variant === 'subtle' && tone === 'neutral' ? 'transparent' : toneBorder;
+
+  return (
+    <View
+      className={cn(cardVariants({ variant, size, tone }), className)}
+      style={[{ backgroundColor: surfaceColor, borderColor }, style]}
+      {...props}
+    />
+  );
 }

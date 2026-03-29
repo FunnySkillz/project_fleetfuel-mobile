@@ -1,10 +1,12 @@
 import React, { type ReactNode } from 'react';
-import { Pressable, Text, View, type PressableProps } from 'react-native';
+import { Pressable, View, type PressableProps } from 'react-native';
 
+import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/cn';
 
+import { AppText } from './app-text';
 import { Card } from './card';
-import { type SemanticTone, toneMutedTextClass, toneTextClass } from './tone';
+import { type SemanticTone, toneMutedTextColor, toneTextColor } from './tone';
 
 type ActionRowProps = PressableProps & {
   label: string;
@@ -27,7 +29,10 @@ export function ActionRow({
   onPress,
   ...props
 }: ActionRowProps) {
+  const theme = useTheme();
   const isDisabled = disabled || loading;
+  const toneColor = toneTextColor(theme, tone);
+  const mutedColor = toneMutedTextColor(theme, tone);
 
   return (
     <Pressable
@@ -39,10 +44,20 @@ export function ActionRow({
       <Card variant="outline" tone={tone} className="w-full">
         <View className="flex-row items-center justify-between gap-3">
           <View className="flex-1 gap-0.5">
-            <Text className={cn('text-sm font-semibold', toneTextClass[tone])}>{label}</Text>
-            {description ? <Text className={cn('text-xs', toneMutedTextClass[tone])}>{description}</Text> : null}
+            <AppText variant="label" style={{ color: toneColor }}>
+              {label}
+            </AppText>
+            {description ? (
+              <AppText variant="caption" style={{ color: mutedColor }}>
+                {description}
+              </AppText>
+            ) : null}
           </View>
-          {trailing ?? <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{'>'}</Text>}
+          {trailing ?? (
+            <AppText variant="caption" color="secondary">
+              {'>'}
+            </AppText>
+          )}
         </View>
       </Card>
     </Pressable>

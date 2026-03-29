@@ -1,11 +1,11 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { Button, Card, EmptyState, SectionHeader } from '@/components/ui';
+import { AppText, Button, Card, EmptyState, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo } from '@/data/repositories';
 import type { EntryDetail, FuelType } from '@/data/types';
@@ -57,9 +57,9 @@ type DetailLineProps = {
 function DetailLine({ label, value }: DetailLineProps) {
   return (
     <View className="gap-0.5">
-      <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{label}</Text>
+      <AppText variant="caption" color="secondary">{label}</AppText>
       {typeof value === 'string' ? (
-        <Text className="text-sm font-semibold text-text dark:text-dark-text">{value}</Text>
+        <AppText variant="label">{value}</AppText>
       ) : (
         value
       )}
@@ -171,7 +171,7 @@ export default function EntryDetailScreen() {
           {status === 'loading' ? (
             <Card className="gap-2">
               <ActivityIndicator color={theme.textSecondary} />
-              <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('entryDetail.loading')}</Text>
+              <AppText variant="caption" color="secondary">{t('entryDetail.loading')}</AppText>
             </Card>
           ) : status === 'error' || !entry ? (
             <EmptyState
