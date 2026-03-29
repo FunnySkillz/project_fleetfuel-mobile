@@ -96,6 +96,14 @@ Define a binary release gate for FleetFuel MVP. MVP ships only when all must-hav
 - [ ] PASS: Language check (`en`, `de`) for tabs, settings, add forms, and logs export labels/alerts.
 - [ ] PASS: iOS navigation checks (header spacing, swipe-back, no dead-end flows).
 
+## Locked Safety Policies (Implemented Contract)
+
+- Receipt lifecycle: manual cleanup policy with explicit orphan scan and cleanup action in `Settings -> Backup and Restore`.
+- Orphan cleanup mode: detect first, then user-confirmed delete of orphan files only.
+- Backup format: single ZIP package with `manifest.json`, SQLite payload, receipts payload, and preferences payload.
+- Restore mode: full replace only (no merge semantics), with preflight validation before destructive overwrite.
+- Startup behavior: app shell is gated behind local DB health check and exposes Retry/Restore actions on failure.
+
 ## Deferred Scope (Not a Release Blocker for MVP)
 
 - Cloud sync behavior.

@@ -30,7 +30,7 @@ export default function SettingsScreen() {
             <ActionRow
               label={t('settings.backup.label')}
               description={t('settings.backup.description')}
-              disabled
+              onPress={() => router.push('/settings/backup-restore')}
             />
           </Card>
         </ScrollView>
