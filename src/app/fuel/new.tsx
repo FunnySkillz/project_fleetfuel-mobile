@@ -11,6 +11,7 @@ import { Button, Card, EmptyState, FormField, Input, SectionHeader, SelectField,
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, fuelRepo, vehiclesRepo } from '@/data/repositories';
 import type { ReceiptAttachment, VehicleListItem } from '@/data/types';
+import { useI18n } from '@/hooks/use-i18n';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import {
   parseDecimalValue,
@@ -64,6 +65,7 @@ export default function AddFuelEntryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
+  const { t } = useI18n();
   const params = useLocalSearchParams<{ vehicleId?: string }>();
 
   const [vehicles, setVehicles] = useState<VehicleListItem[]>([]);
@@ -209,56 +211,56 @@ export default function AddFuelEntryScreen() {
     const result: FuelFormErrors = {};
 
     if (!selectedVehicleId) {
-      result.vehicleId = 'Vehicle is required.';
+      result.vehicleId = t('fuelForm.error.vehicleRequired');
     }
 
     if (liters.trim().length === 0) {
-      result.liters = 'Liters is required.';
+      result.liters = t('fuelForm.error.litersRequired');
     } else if (litersValue === null) {
-      result.liters = 'Liters must be a valid number.';
+      result.liters = t('fuelForm.error.litersNumber');
     } else if (litersValue <= 0) {
-      result.liters = 'Liters must be greater than 0.';
+      result.liters = t('fuelForm.error.litersPositive');
     } else if (litersValue > LITERS_MAX) {
-      result.liters = `Liters must be less than or equal to ${LITERS_MAX}.`;
+      result.liters = t('fuelForm.error.litersMax', { max: LITERS_MAX });
     }
 
     if (price.trim().length === 0) {
-      result.price = 'Total price is required.';
+      result.price = t('fuelForm.error.priceRequired');
     } else if (priceValue === null) {
-      result.price = 'Total price must be a valid number.';
+      result.price = t('fuelForm.error.priceNumber');
     } else if (priceValue <= 0) {
-      result.price = 'Total price must be greater than 0.';
+      result.price = t('fuelForm.error.pricePositive');
     } else if (priceValue > PRICE_MAX) {
-      result.price = `Total price must be less than or equal to ${PRICE_MAX}.`;
+      result.price = t('fuelForm.error.priceMax', { max: PRICE_MAX });
     }
 
     const stationLength = trimmedLength(station);
     if (stationLength === 0) {
-      result.station = 'Station/vendor is required.';
+      result.station = t('fuelForm.error.stationRequired');
     } else if (stationLength < STATION_MIN) {
-      result.station = `Station/vendor must be at least ${STATION_MIN} characters.`;
+      result.station = t('fuelForm.error.stationMin', { min: STATION_MIN });
     } else if (stationLength > STATION_MAX) {
-      result.station = `Station/vendor must be at most ${STATION_MAX} characters.`;
+      result.station = t('fuelForm.error.stationMax', { max: STATION_MAX });
     }
 
     if (odometer.trim().length === 0) {
-      result.odometer = 'Current km is required.';
+      result.odometer = t('fuelForm.error.currentKmRequired');
     } else if (odometerValue === null) {
-      result.odometer = 'Current km must be a whole number.';
+      result.odometer = t('fuelForm.error.currentKmInteger');
     } else if (latestRecordedKm !== null && odometerValue < latestRecordedKm) {
-      result.odometer = `Current km cannot be below latest recorded km (${latestRecordedKm}).`;
+      result.odometer = t('fuelForm.error.currentKmBelowLatest', { value: latestRecordedKm });
     }
 
     if (trimmedLength(notes) > NOTES_MAX) {
-      result.notes = `Notes must be at most ${NOTES_MAX} characters.`;
+      result.notes = t('fuelForm.error.notesMax', { max: NOTES_MAX });
     }
 
     if (receipt && !receipt.uri) {
-      result.receipt = 'Attached receipt is invalid.';
+      result.receipt = t('fuelForm.error.receiptInvalid');
     }
 
     return result;
-  }, [latestRecordedKm, liters, litersValue, notes, odometer, odometerValue, price, priceValue, receipt, selectedVehicleId, station]);
+  }, [latestRecordedKm, liters, litersValue, notes, odometer, odometerValue, price, priceValue, receipt, selectedVehicleId, station, t]);
 
   const isValid =
     !errors.vehicleId && !errors.liters && !errors.price && !errors.station && !errors.odometer && !errors.notes && !errors.receipt;
@@ -283,7 +285,7 @@ export default function AddFuelEntryScreen() {
     });
 
     if (!isValid || litersValue === null || priceValue === null || odometerValue === null) {
-      Alert.alert('Check form', 'Please fix validation errors before saving.');
+      Alert.alert(t('common.checkFormTitle'), t('common.fixValidationErrors'));
       return;
     }
 
@@ -302,7 +304,7 @@ export default function AddFuelEntryScreen() {
       allowNextNavigation();
       router.back();
     } catch (error) {
-      Alert.alert('Could not save fuel entry', error instanceof Error ? error.message : 'Unexpected error.');
+      Alert.alert(t('fuelForm.alert.saveFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
     } finally {
       setSaving(false);
     }
@@ -317,7 +319,7 @@ export default function AddFuelEntryScreen() {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Camera permission needed', 'Enable camera access to take a receipt photo.');
+        Alert.alert(t('fuelForm.alert.cameraPermissionTitle'), t('fuelForm.alert.cameraPermissionMessage'));
         return;
       }
 
@@ -344,7 +346,7 @@ export default function AddFuelEntryScreen() {
       });
       setTouched((prev) => ({ ...prev, receipt: true }));
     } catch (error) {
-      Alert.alert('Could not attach photo', error instanceof Error ? error.message : 'Unexpected error.');
+      Alert.alert(t('fuelForm.alert.attachPhotoFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
     } finally {
       setAttachmentBusy(false);
     }
@@ -359,7 +361,7 @@ export default function AddFuelEntryScreen() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Photos permission needed', 'Enable photo library access to select a receipt image.');
+        Alert.alert(t('fuelForm.alert.photosPermissionTitle'), t('fuelForm.alert.photosPermissionMessage'));
         return;
       }
 
@@ -387,7 +389,7 @@ export default function AddFuelEntryScreen() {
       });
       setTouched((prev) => ({ ...prev, receipt: true }));
     } catch (error) {
-      Alert.alert('Could not attach image', error instanceof Error ? error.message : 'Unexpected error.');
+      Alert.alert(t('fuelForm.alert.attachImageFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
     } finally {
       setAttachmentBusy(false);
     }
@@ -424,7 +426,7 @@ export default function AddFuelEntryScreen() {
       });
       setTouched((prev) => ({ ...prev, receipt: true }));
     } catch (error) {
-      Alert.alert('Could not attach PDF', error instanceof Error ? error.message : 'Unexpected error.');
+      Alert.alert(t('fuelForm.alert.attachPdfFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
     } finally {
       setAttachmentBusy(false);
     }
@@ -441,18 +443,18 @@ export default function AddFuelEntryScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
           <SectionHeader
-            title="Add Fuel Entry"
-            description="Track refuels with receipt evidence and local-first consumption preview."
+            title={t('fuelForm.title')}
+            description={t('fuelForm.description')}
           />
 
           <Card className="gap-3">
             <FormField
-              label="Vehicle"
+              label={t('fuelForm.vehicleLabel')}
               required
               error={showError('vehicleId') ? errors.vehicleId : null}
-              hint={hasVehicles ? undefined : 'Add a vehicle first, then create fuel entries.'}>
+              hint={hasVehicles ? undefined : t('fuelForm.vehicleHint')}>
               {vehiclesLoading ? (
-                <Input value="Loading vehicles..." editable={false} variant="subtle" />
+                <Input value={t('common.loadingVehicles')} editable={false} variant="subtle" />
               ) : hasVehicles ? (
                 <SelectField
                   options={vehicles.map((vehicle) => ({
@@ -467,21 +469,21 @@ export default function AddFuelEntryScreen() {
                 />
               ) : (
                 <EmptyState
-                  title="No vehicle available"
-                  description="Create your first vehicle to start recording fuel entries."
-                  actionLabel="Add Vehicle"
+                  title={t('fuelForm.noVehicle.title')}
+                  description={t('fuelForm.noVehicle.description')}
+                  actionLabel={t('add.actionSheet.addVehicle')}
                   onAction={() => router.push('/vehicles/new')}
                 />
               )}
             </FormField>
 
             <FormField
-              label="Current Km (Tacho)"
+              label={t('fuelForm.field.currentKm')}
               required
               hint={
                 latestRecordedKm !== null
-                  ? `Latest recorded km: ${latestRecordedKm}`
-                  : 'No previous odometer record found for this vehicle.'
+                  ? t('fuelForm.hint.currentKmLatest', { value: latestRecordedKm })
+                  : t('fuelForm.hint.currentKmNoLatest')
               }
               error={showError('odometer') ? errors.odometer : null}>
               <Input
@@ -489,43 +491,43 @@ export default function AddFuelEntryScreen() {
                 onChangeText={(value) => setOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
                 onBlur={() => setTouched((prev) => ({ ...prev, odometer: true }))}
                 keyboardType="number-pad"
-                placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : '84210'}
+                placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : t('fuelForm.placeholder.currentKm')}
                 tone={showError('odometer') ? 'destructive' : 'neutral'}
               />
             </FormField>
 
-            <FormField label="Liters" required error={showError('liters') ? errors.liters : null}>
+            <FormField label={t('fuelForm.field.liters')} required error={showError('liters') ? errors.liters : null}>
               <Input
                 value={liters}
                 onChangeText={(value) => setLiters(sanitizeDecimalInput(value, LITERS_INTEGER_DIGITS, LITERS_FRACTION_DIGITS))}
                 onBlur={() => setTouched((prev) => ({ ...prev, liters: true }))}
                 keyboardType="decimal-pad"
-                placeholder="42.4"
+                placeholder={t('fuelForm.placeholder.liters')}
                 tone={showError('liters') ? 'destructive' : 'neutral'}
               />
             </FormField>
 
-            <FormField label="Total Price" required error={showError('price') ? errors.price : null}>
+            <FormField label={t('fuelForm.field.price')} required error={showError('price') ? errors.price : null}>
               <Input
                 value={price}
                 onChangeText={(value) => setPrice(sanitizeDecimalInput(value, PRICE_INTEGER_DIGITS, PRICE_FRACTION_DIGITS))}
                 onBlur={() => setTouched((prev) => ({ ...prev, price: true }))}
                 keyboardType="decimal-pad"
-                placeholder="72.10"
+                placeholder={t('fuelForm.placeholder.price')}
                 tone={showError('price') ? 'destructive' : 'neutral'}
               />
             </FormField>
 
             <FormField
-              label="Station / Vendor"
+              label={t('fuelForm.field.station')}
               required
-              hint={`${trimmedLength(station)}/${STATION_MAX}`}
+              hint={t('common.charCount', { current: trimmedLength(station), max: STATION_MAX })}
               error={showError('station') ? errors.station : null}>
               <Input
                 value={station}
                 onChangeText={(value) => setStation(value.replace(/\n/g, ' ').slice(0, STATION_MAX))}
                 onBlur={() => setTouched((prev) => ({ ...prev, station: true }))}
-                placeholder="OMV City Center"
+                placeholder={t('fuelForm.placeholder.station')}
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={STATION_MAX}
@@ -534,40 +536,44 @@ export default function AddFuelEntryScreen() {
             </FormField>
 
             <FormField
-              label="Avg Consumption (readonly)"
+              label={t('fuelForm.field.avgReadonly')}
               hint={
                 previousFuelKm !== null
-                  ? `Based on previous fuel record at ${previousFuelKm} km.`
-                  : 'First fuel record for this vehicle, so no comparison baseline yet.'
+                  ? t('fuelForm.hint.avgWithPrevious', { value: previousFuelKm })
+                  : t('fuelForm.hint.avgNoPrevious')
               }>
               <Input
-                value={avgConsumptionPreview !== null ? `${avgConsumptionPreview.toFixed(2)} L / 100 km` : 'Need liters + previous fuel km'}
+                value={
+                  avgConsumptionPreview !== null
+                    ? t('fuelForm.hint.avgValue', { value: avgConsumptionPreview.toFixed(2) })
+                    : t('fuelForm.hint.avgPending')
+                }
                 editable={false}
                 variant="subtle"
               />
             </FormField>
 
             <FormField
-              label="Receipt / Evidence (optional)"
+              label={t('fuelForm.field.receipt')}
               error={showError('receipt') ? errors.receipt : null}
-              hint="Take a photo, upload a photo, or attach a PDF receipt.">
+              hint={t('fuelForm.receiptHint')}>
               <Card variant="subtle" className="gap-2">
                 <Button
-                  label="Take Photo"
+                  label={t('fuelForm.takePhoto')}
                   variant="secondary"
                   size="sm"
                   disabled={attachmentBusy}
                   onPress={() => void attachFromCamera()}
                 />
                 <Button
-                  label="Upload Photo"
+                  label={t('fuelForm.uploadPhoto')}
                   variant="secondary"
                   size="sm"
                   disabled={attachmentBusy}
                   onPress={() => void attachFromGallery()}
                 />
                 <Button
-                  label="Upload PDF"
+                  label={t('fuelForm.uploadPdf')}
                   variant="secondary"
                   size="sm"
                   disabled={attachmentBusy}
@@ -578,20 +584,26 @@ export default function AddFuelEntryScreen() {
               {receipt ? (
                 <Card variant="subtle" className="mt-2 gap-1.5">
                   <Input value={receipt.name} editable={false} variant="ghost" />
-                  <Button label="Remove Receipt" variant="ghost" size="sm" onPress={() => setReceipt(null)} className="self-start" />
+                  <Button
+                    label={t('fuelForm.removeReceipt')}
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => setReceipt(null)}
+                    className="self-start"
+                  />
                 </Card>
               ) : null}
             </FormField>
 
             <FormField
-              label="Notes (optional)"
-              hint={`${trimmedLength(notes)}/${NOTES_MAX}`}
+              label={t('fuelForm.field.notes')}
+              hint={t('common.charCount', { current: trimmedLength(notes), max: NOTES_MAX })}
               error={showError('notes') ? errors.notes : null}>
               <TextArea
                 value={notes}
                 onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
                 onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
-                placeholder="Receipt reference, route context, etc."
+                placeholder={t('fuelForm.placeholder.notes')}
                 autoCapitalize="sentences"
                 maxLength={NOTES_MAX}
                 tone={showError('notes') ? 'destructive' : 'neutral'}
@@ -600,10 +612,10 @@ export default function AddFuelEntryScreen() {
           </Card>
 
           <Button
-            label={attachmentBusy ? 'Preparing attachment...' : 'Save Fuel Entry'}
+            label={attachmentBusy ? t('fuelForm.preparingAttachment') : t('fuelForm.save')}
             variant="primary"
             loading={saving}
-            loadingLabel="Saving..."
+            loadingLabel={t('fuelForm.saving')}
             disabled={!canSubmit}
             onPress={() => void handleSave()}
           />

@@ -1,6 +1,6 @@
 # FleetFuel MVP Definition
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
 ## Purpose
 
@@ -52,6 +52,8 @@ Users currently track trips, fuel, odometer events, and receipts manually across
 - Capture odometer values manually.
 - Export records locally.
 - Backup and restore local data.
+- Configure appearance mode (`system`, `light`, `dark`) in Settings.
+- Configure app language (`en`, `de`) in Settings.
 
 ## Suggested Trip Fields
 
@@ -95,13 +97,16 @@ Notes:
 | Add Fuel Entry | `/fuel/new` | mutable |
 | Entry Detail/Edit | `/entries/[entryId]` or `/entries/[entryId]/edit` | read-only or mutable |
 | Export (from Logs) | `/logs/export` | mutable |
-| Settings | `/settings` and `/settings/*` | read-only or mutable by subroute |
+| Settings | `/settings` | read-only |
+| Appearance | `/settings/appearance` | mutable (immediate preference mutation) |
+| Backup/Restore | `/settings/backup-restore` | mutable |
 
 ## Navigation Concept (MVP)
 
 - Root navigation is tab-based for primary sections: Dashboard, Vehicles, Add, Logs, Settings.
 - Add is a center tab trigger that opens an action sheet and routes to create flows.
 - Detail routes are pushed from list routes to preserve native back/swipe-back behavior.
+- Settings is not a placeholder route; Appearance is active and persists user preferences.
 - Every route is classified before implementation:
   - `read-only`: frictionless back and swipe-back when history exists.
   - `mutable`: unsaved-changes guard required on exit.

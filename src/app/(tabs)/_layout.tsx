@@ -13,22 +13,26 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
+import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 
-function AddTabButton({ onPress }: BottomTabBarButtonProps & { onPress: PressableProps['onPress'] }) {
+function AddTabButton({
+  onPress,
+  label,
+}: BottomTabBarButtonProps & { onPress: PressableProps['onPress']; label: string }) {
   const theme = useTheme();
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Add"
+      accessibilityLabel={label}
       onPress={onPress}
       style={({ pressed }) => [styles.addButtonWrap, pressed && styles.pressed]}>
       <View style={[styles.addButtonSurface, { backgroundColor: theme.backgroundElement }]}>
         <ThemedText type="smallBold" style={styles.addGlyph}>
           +
         </ThemedText>
-        <ThemedText type="smallBold">Add</ThemedText>
+        <ThemedText type="smallBold">{label}</ThemedText>
       </View>
     </Pressable>
   );
@@ -36,6 +40,7 @@ function AddTabButton({ onPress }: BottomTabBarButtonProps & { onPress: Pressabl
 
 export default function TabsLayout() {
   const theme = useTheme();
+  const { t } = useI18n();
   const router = useRouter();
 
   const openAddMenu = useCallback(() => {
@@ -46,8 +51,13 @@ export default function TabsLayout() {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          title: 'Create New Entry',
-          options: ['Add Trip', 'Add Fuel', 'Add Vehicle', 'Cancel'],
+          title: t('add.actionSheet.title'),
+          options: [
+            t('add.actionSheet.addTrip'),
+            t('add.actionSheet.addFuel'),
+            t('add.actionSheet.addVehicle'),
+            t('common.cancel'),
+          ],
           cancelButtonIndex: 3,
         },
         (buttonIndex) => {
@@ -59,13 +69,13 @@ export default function TabsLayout() {
       return;
     }
 
-    Alert.alert('Create New Entry', 'Choose what you want to add.', [
-      { text: 'Add Trip', onPress: () => goTo('/trips/new') },
-      { text: 'Add Fuel', onPress: () => goTo('/fuel/new') },
-      { text: 'Add Vehicle', onPress: () => goTo('/vehicles/new') },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('add.actionSheet.title'), t('add.actionSheet.message'), [
+      { text: t('add.actionSheet.addTrip'), onPress: () => goTo('/trips/new') },
+      { text: t('add.actionSheet.addFuel'), onPress: () => goTo('/fuel/new') },
+      { text: t('add.actionSheet.addVehicle'), onPress: () => goTo('/vehicles/new') },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
-  }, [router]);
+  }, [router, t]);
 
   return (
     <Tabs
@@ -84,37 +94,37 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          tabBarLabel: 'Dashboard',
+          title: t('nav.dashboard'),
+          tabBarLabel: t('nav.dashboard'),
         }}
       />
       <Tabs.Screen
         name="vehicles/index"
         options={{
-          title: 'Vehicles',
-          tabBarLabel: 'Vehicles',
+          title: t('nav.vehicles'),
+          tabBarLabel: t('nav.vehicles'),
         }}
       />
       <Tabs.Screen
         name="add"
         options={{
-          title: 'Add',
-          tabBarLabel: 'Add',
-          tabBarButton: (props) => <AddTabButton {...props} onPress={openAddMenu} />,
+          title: t('nav.add'),
+          tabBarLabel: t('nav.add'),
+          tabBarButton: (props) => <AddTabButton {...props} onPress={openAddMenu} label={t('add.buttonLabel')} />,
         }}
       />
       <Tabs.Screen
         name="logs/index"
         options={{
-          title: 'Logs',
-          tabBarLabel: 'Logs',
+          title: t('nav.logs'),
+          tabBarLabel: t('nav.logs'),
         }}
       />
       <Tabs.Screen
         name="settings/index"
         options={{
-          title: 'Settings',
-          tabBarLabel: 'Settings',
+          title: t('nav.settings'),
+          tabBarLabel: t('nav.settings'),
         }}
       />
     </Tabs>

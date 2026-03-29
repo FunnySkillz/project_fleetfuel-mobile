@@ -9,6 +9,7 @@ import { Button, Card, DateTimeField, EmptyState, FormField, Input, SectionHeade
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, tripsRepo, vehiclesRepo } from '@/data/repositories';
 import type { TripPrivateTag, VehicleListItem } from '@/data/types';
+import { useI18n } from '@/hooks/use-i18n';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { parseIntegerValue, sanitizeIntegerInput, trimmedLength } from '@/utils/form-input';
 
@@ -47,6 +48,7 @@ export default function AddTripScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
+  const { t } = useI18n();
   const params = useLocalSearchParams<{ vehicleId?: string }>();
 
   const [vehicles, setVehicles] = useState<VehicleListItem[]>([]);
@@ -201,65 +203,65 @@ export default function AddTripScreen() {
     const endLocationLength = trimmedLength(endLocation);
 
     if (!selectedVehicleId) {
-      result.vehicleId = 'Vehicle is required.';
+      result.vehicleId = t('tripForm.error.vehicleRequired');
     }
 
     if (startOdometer.trim().length === 0) {
-      result.startOdometer = 'Start km is required.';
+      result.startOdometer = t('tripForm.error.startKmRequired');
     } else if (startKmValue === null) {
-      result.startOdometer = 'Start km must be a whole number.';
+      result.startOdometer = t('tripForm.error.startKmInteger');
     } else if (latestRecordedKm !== null && startKmValue < latestRecordedKm) {
-      result.startOdometer = `Start km cannot be below latest recorded km (${latestRecordedKm}).`;
+      result.startOdometer = t('tripForm.error.startKmBelowLatest', { value: latestRecordedKm });
     }
 
     if (endOdometer.trim().length === 0) {
-      result.endOdometer = 'Current km is required.';
+      result.endOdometer = t('tripForm.error.currentKmRequired');
     } else if (endKmValue === null) {
-      result.endOdometer = 'Current km must be a whole number.';
+      result.endOdometer = t('tripForm.error.currentKmInteger');
     } else if (startKmValue !== null && endKmValue < startKmValue) {
-      result.endOdometer = 'Current km cannot be less than start km.';
+      result.endOdometer = t('tripForm.error.currentKmBelowStart');
     } else if (startKmValue !== null && endKmValue === startKmValue) {
-      result.endOdometer = 'Current km must be greater than start km.';
+      result.endOdometer = t('tripForm.error.currentKmEqualStart');
     } else if (latestRecordedKm !== null && endKmValue < latestRecordedKm) {
-      result.endOdometer = `Current km cannot be below latest recorded km (${latestRecordedKm}).`;
+      result.endOdometer = t('tripForm.error.currentKmBelowLatest', { value: latestRecordedKm });
     }
 
     if (purposeLength === 0) {
-      result.purpose = 'Purpose is required.';
+      result.purpose = t('tripForm.error.purposeRequired');
     } else if (purposeLength < PURPOSE_MIN) {
-      result.purpose = `Purpose must be at least ${PURPOSE_MIN} characters.`;
+      result.purpose = t('tripForm.error.purposeMin', { min: PURPOSE_MIN });
     } else if (purposeLength > PURPOSE_MAX) {
-      result.purpose = `Purpose must be at most ${PURPOSE_MAX} characters.`;
+      result.purpose = t('tripForm.error.purposeMax', { max: PURPOSE_MAX });
     }
 
     if (privateTag === null) {
-      result.privateTag = 'Trip classification is required (Business or Private).';
+      result.privateTag = t('tripForm.error.classificationRequired');
     }
 
     if (startTime.trim().length > 0 && !isValidTime(startTime.trim())) {
-      result.startTime = 'Start time must use HH:MM (24h).';
+      result.startTime = t('tripForm.error.startTimeFormat');
     }
 
     if (endTime.trim().length > 0 && !isValidTime(endTime.trim())) {
-      result.endTime = 'End time must use HH:MM (24h).';
+      result.endTime = t('tripForm.error.endTimeFormat');
     }
 
     if (startTime.trim().length > 0 && endTime.trim().length > 0 && isValidTime(startTime.trim()) && isValidTime(endTime.trim())) {
       if (endTime.trim() < startTime.trim()) {
-        result.endTime = 'End time must be later than or equal to start time.';
+        result.endTime = t('tripForm.error.endTimeBeforeStart');
       }
     }
 
     if (startLocationLength > LOCATION_MAX) {
-      result.startLocation = `Start location must be at most ${LOCATION_MAX} characters.`;
+      result.startLocation = t('tripForm.error.startLocationMax', { max: LOCATION_MAX });
     }
 
     if (endLocationLength > LOCATION_MAX) {
-      result.endLocation = `End location must be at most ${LOCATION_MAX} characters.`;
+      result.endLocation = t('tripForm.error.endLocationMax', { max: LOCATION_MAX });
     }
 
     if (notesLength > NOTES_MAX) {
-      result.notes = `Notes must be at most ${NOTES_MAX} characters.`;
+      result.notes = t('tripForm.error.notesMax', { max: NOTES_MAX });
     }
 
     return result;
@@ -277,6 +279,7 @@ export default function AddTripScreen() {
     startLocation,
     startOdometer,
     startTime,
+    t,
   ]);
 
   const isValid =
@@ -314,7 +317,7 @@ export default function AddTripScreen() {
     });
 
     if (!isValid || startKmValue === null || endKmValue === null) {
-      Alert.alert('Check form', 'Please fix validation errors before saving.');
+      Alert.alert(t('common.checkFormTitle'), t('common.fixValidationErrors'));
       return;
     }
 
@@ -336,7 +339,7 @@ export default function AddTripScreen() {
       allowNextNavigation();
       router.back();
     } catch (error) {
-      Alert.alert('Could not save trip', error instanceof Error ? error.message : 'Unexpected error.');
+      Alert.alert(t('tripForm.alert.saveFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
     } finally {
       setSaving(false);
     }
@@ -353,18 +356,18 @@ export default function AddTripScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
           <SectionHeader
-            title="Add Trip"
-            description="Capture odometer-safe trips with mandatory work/private classification for export accuracy."
+            title={t('tripForm.title')}
+            description={t('tripForm.description')}
           />
 
           <Card className="gap-3">
             <FormField
-              label="Vehicle"
+              label={t('tripForm.vehicleLabel')}
               required
               error={showError('vehicleId') ? errors.vehicleId : null}
-              hint={hasVehicles ? undefined : 'Add a vehicle first, then create trip entries.'}>
+              hint={hasVehicles ? undefined : t('tripForm.vehicleHint')}>
               {vehiclesLoading ? (
-                <Input value="Loading vehicles..." editable={false} variant="subtle" />
+                <Input value={t('common.loadingVehicles')} editable={false} variant="subtle" />
               ) : hasVehicles ? (
                 <SelectField
                   options={vehicles.map((vehicle) => ({
@@ -379,21 +382,21 @@ export default function AddTripScreen() {
                 />
               ) : (
                 <EmptyState
-                  title="No vehicle available"
-                  description="Create your first vehicle to start recording trips."
-                  actionLabel="Add Vehicle"
+                  title={t('tripForm.noVehicle.title')}
+                  description={t('tripForm.noVehicle.description')}
+                  actionLabel={t('add.actionSheet.addVehicle')}
                   onAction={() => router.push('/vehicles/new')}
                 />
               )}
             </FormField>
 
             <FormField
-              label="Start Km"
+              label={t('tripForm.field.startKm')}
               required
               hint={
                 latestRecordedKm !== null
-                  ? `Suggested from latest record: ${latestRecordedKm} km`
-                  : 'No previous odometer record found. Enter your start km manually.'
+                  ? t('tripForm.hint.startKmLatest', { value: latestRecordedKm })
+                  : t('tripForm.hint.startKmNoLatest')
               }
               error={showError('startOdometer') ? errors.startOdometer : null}>
               <Input
@@ -402,13 +405,13 @@ export default function AddTripScreen() {
                 onBlur={() => setTouched((prev) => ({ ...prev, startOdometer: true }))}
                 keyboardType="number-pad"
                 disabled={latestRecordedKm !== null}
-                placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : '84000'}
+                placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : t('tripForm.placeholder.currentKm')}
                 tone={showError('startOdometer') ? 'destructive' : 'neutral'}
               />
             </FormField>
 
             <FormField
-              label="Current Km (Tacho)"
+              label={t('tripForm.field.currentKm')}
               required
               error={showError('endOdometer') ? errors.endOdometer : null}>
               <Input
@@ -416,25 +419,29 @@ export default function AddTripScreen() {
                 onChangeText={(value) => setEndOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
                 onBlur={() => setTouched((prev) => ({ ...prev, endOdometer: true }))}
                 keyboardType="number-pad"
-                placeholder="84210"
+                placeholder={t('tripForm.placeholder.currentKm')}
                 tone={showError('endOdometer') ? 'destructive' : 'neutral'}
               />
             </FormField>
 
-            <FormField label="Distance (readonly)">
-              <Input value={distanceKm !== null ? `${distanceKm} km` : 'Fill km values'} editable={false} variant="subtle" />
+            <FormField label={t('tripForm.field.distanceReadonly')}>
+              <Input
+                value={distanceKm !== null ? t('tripForm.hint.distanceValue', { value: distanceKm }) : t('tripForm.hint.distancePending')}
+                editable={false}
+                variant="subtle"
+              />
             </FormField>
 
             <FormField
-              label="Purpose"
+              label={t('tripForm.field.purpose')}
               required
-              hint={`${trimmedLength(purpose)}/${PURPOSE_MAX}`}
+              hint={t('common.charCount', { current: trimmedLength(purpose), max: PURPOSE_MAX })}
               error={showError('purpose') ? errors.purpose : null}>
               <Input
                 value={purpose}
                 onChangeText={(value) => setPurpose(value.replace(/\n/g, ' ').slice(0, PURPOSE_MAX))}
                 onBlur={() => setTouched((prev) => ({ ...prev, purpose: true }))}
-                placeholder="Client meeting"
+                placeholder={t('tripForm.placeholder.purpose')}
                 autoCapitalize="sentences"
                 autoCorrect={false}
                 maxLength={PURPOSE_MAX}
@@ -444,38 +451,38 @@ export default function AddTripScreen() {
 
             <View style={styles.rowTwoCols}>
               <View style={styles.col}>
-                <FormField label="Start Time (optional)" error={showError('startTime') ? errors.startTime : null}>
+                <FormField label={t('tripForm.field.startTime')} error={showError('startTime') ? errors.startTime : null}>
                   <DateTimeField
                     mode="time"
                     value={startTime}
                     onChangeText={(value) => setStartTime(sanitizeTimeInput(value))}
                     onBlur={() => setTouched((prev) => ({ ...prev, startTime: true }))}
-                    placeholder="08:30"
+                    placeholder={t('tripForm.placeholder.startTime')}
                     tone={showError('startTime') ? 'destructive' : 'neutral'}
                   />
                 </FormField>
               </View>
 
               <View style={styles.col}>
-                <FormField label="End Time (optional)" error={showError('endTime') ? errors.endTime : null}>
+                <FormField label={t('tripForm.field.endTime')} error={showError('endTime') ? errors.endTime : null}>
                   <DateTimeField
                     mode="time"
                     value={endTime}
                     onChangeText={(value) => setEndTime(sanitizeTimeInput(value))}
                     onBlur={() => setTouched((prev) => ({ ...prev, endTime: true }))}
-                    placeholder="09:10"
+                    placeholder={t('tripForm.placeholder.endTime')}
                     tone={showError('endTime') ? 'destructive' : 'neutral'}
                   />
                 </FormField>
               </View>
             </View>
 
-            <FormField label="Start Location (optional)" error={showError('startLocation') ? errors.startLocation : null}>
+            <FormField label={t('tripForm.field.startLocation')} error={showError('startLocation') ? errors.startLocation : null}>
               <Input
                 value={startLocation}
                 onChangeText={(value) => setStartLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX))}
                 onBlur={() => setTouched((prev) => ({ ...prev, startLocation: true }))}
-                placeholder="Vienna Office"
+                placeholder={t('tripForm.placeholder.startLocation')}
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={LOCATION_MAX}
@@ -483,12 +490,12 @@ export default function AddTripScreen() {
               />
             </FormField>
 
-            <FormField label="End Location (optional)" error={showError('endLocation') ? errors.endLocation : null}>
+            <FormField label={t('tripForm.field.endLocation')} error={showError('endLocation') ? errors.endLocation : null}>
               <Input
                 value={endLocation}
                 onChangeText={(value) => setEndLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX))}
                 onBlur={() => setTouched((prev) => ({ ...prev, endLocation: true }))}
-                placeholder="Client HQ"
+                placeholder={t('tripForm.placeholder.endLocation')}
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={LOCATION_MAX}
@@ -497,14 +504,14 @@ export default function AddTripScreen() {
             </FormField>
 
             <FormField
-              label="Trip Classification"
+              label={t('tripForm.field.classification')}
               required
-              hint="Required for export filtering and clear work/private separation."
+              hint={t('tripForm.hint.classification')}
               error={showError('privateTag') ? errors.privateTag : null}>
               <SelectField
                 options={[
-                  { value: 'business', label: 'Business' },
-                  { value: 'private', label: 'Private' },
+                  { value: 'business', label: t('tripForm.classification.business') },
+                  { value: 'private', label: t('tripForm.classification.private') },
                 ]}
                 value={privateTag}
                 onChange={(value) => {
@@ -515,14 +522,14 @@ export default function AddTripScreen() {
             </FormField>
 
             <FormField
-              label="Notes (optional)"
-              hint={`${trimmedLength(notes)}/${NOTES_MAX}`}
+              label={t('tripForm.field.notes')}
+              hint={t('common.charCount', { current: trimmedLength(notes), max: NOTES_MAX })}
               error={showError('notes') ? errors.notes : null}>
               <TextArea
                 value={notes}
                 onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
                 onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
-                placeholder="Parking and toll included"
+                placeholder={t('tripForm.placeholder.notes')}
                 autoCapitalize="sentences"
                 maxLength={NOTES_MAX}
                 tone={showError('notes') ? 'destructive' : 'neutral'}
@@ -531,9 +538,9 @@ export default function AddTripScreen() {
           </Card>
 
           <Button
-            label="Save Trip"
+            label={t('tripForm.save')}
             loading={saving}
-            loadingLabel="Saving..."
+            loadingLabel={t('tripForm.saving')}
             variant="primary"
             disabled={!canSubmit}
             onPress={() => void handleSave()}

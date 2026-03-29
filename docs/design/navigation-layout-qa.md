@@ -1,6 +1,6 @@
 # FleetFuel Navigation and Layout QA Guide
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
 ## Purpose
 
@@ -42,6 +42,8 @@ Rules:
 - Allow frictionless back behavior.
 - Allow native iOS swipe-back when navigation history exists.
 - Do not add unsaved-changes guards.
+- Exception note:
+  - `settings/appearance` mutates preferences immediately but is still treated as read-only navigation behavior (no unsaved draft state).
 
 ### Mutable routes
 

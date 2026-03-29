@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Button, Card, FormField, Input, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
+import { useI18n } from '@/hooks/use-i18n';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { parseIntegerValue, sanitizeIntegerInput, sanitizePlateInput, trimmedLength } from '@/utils/form-input';
 
@@ -39,6 +40,7 @@ function sanitizeVinInput(value: string) {
 export default function AddVehicleScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
 
   const [name, setName] = useState('');
   const [plate, setPlate] = useState('');
@@ -86,62 +88,62 @@ export default function AddVehicleScreen() {
     const normalizedPlate = normalizeInputText(plate);
 
     if (normalizedName.length === 0) {
-      result.name = 'Vehicle name is required.';
+      result.name = t('vehicleForm.error.nameRequired');
     } else if (normalizedName.length < VEHICLE_NAME_MIN) {
-      result.name = `Vehicle name must be at least ${VEHICLE_NAME_MIN} characters.`;
+      result.name = t('vehicleForm.error.nameMin', { min: VEHICLE_NAME_MIN });
     } else if (normalizedName.length > VEHICLE_NAME_MAX) {
-      result.name = `Vehicle name must be at most ${VEHICLE_NAME_MAX} characters.`;
+      result.name = t('vehicleForm.error.nameMax', { max: VEHICLE_NAME_MAX });
     }
 
     if (normalizedPlate.length === 0) {
-      result.plate = 'License plate is required.';
+      result.plate = t('vehicleForm.error.plateRequired');
     } else if (normalizedPlate.length < LICENSE_PLATE_MIN) {
-      result.plate = `License plate must be at least ${LICENSE_PLATE_MIN} characters.`;
+      result.plate = t('vehicleForm.error.plateMin', { min: LICENSE_PLATE_MIN });
     } else if (normalizedPlate.length > LICENSE_PLATE_MAX) {
-      result.plate = `License plate must be at most ${LICENSE_PLATE_MAX} characters.`;
+      result.plate = t('vehicleForm.error.plateMax', { max: LICENSE_PLATE_MAX });
     } else if (!/^[A-Z0-9 -]+$/.test(normalizedPlate)) {
-      result.plate = 'License plate can only contain A-Z, 0-9, spaces, and hyphen.';
+      result.plate = t('vehicleForm.error.platePattern');
     }
 
     const yearValue = parseIntegerValue(year);
     if (year.trim().length > 0) {
       const maxYear = new Date().getUTCFullYear() + 1;
       if (yearValue === null || yearValue < 1950 || yearValue > maxYear) {
-        result.year = `Year must be between 1950 and ${maxYear}.`;
+        result.year = t('vehicleForm.error.yearRange', { min: 1950, max: maxYear });
       }
     }
 
     const psValue = parseIntegerValue(ps);
     if (ps.trim().length > 0 && (psValue === null || psValue < 1 || psValue > 3000)) {
-      result.ps = 'PS must be between 1 and 3000.';
+      result.ps = t('vehicleForm.error.psRange', { min: 1, max: 3000 });
     }
 
     const kwValue = parseIntegerValue(kw);
     if (kw.trim().length > 0 && (kwValue === null || kwValue < 1 || kwValue > 3000)) {
-      result.kw = 'kW must be between 1 and 3000.';
+      result.kw = t('vehicleForm.error.kwRange', { min: 1, max: 3000 });
     }
 
     const engineCcValue = parseIntegerValue(engineDisplacementCc);
     if (engineDisplacementCc.trim().length > 0 && (engineCcValue === null || engineCcValue < 50 || engineCcValue > 20000)) {
-      result.engineDisplacementCc = 'Hubraum must be between 50 and 20000 cc.';
+      result.engineDisplacementCc = t('vehicleForm.error.displacementRange', { min: 50, max: 20000 });
     }
 
     const normalizedVin = normalizeInputText(vin);
     if (normalizedVin.length > 0) {
       if (normalizedVin.length < 11 || normalizedVin.length > 17) {
-        result.vin = 'VIN must be between 11 and 17 characters.';
+        result.vin = t('vehicleForm.error.vinLength', { min: 11, max: 17 });
       } else if (!/^[A-HJ-NPR-Z0-9]+$/.test(normalizedVin)) {
-        result.vin = 'VIN can only contain A-Z (without I, O, Q) and numbers.';
+        result.vin = t('vehicleForm.error.vinPattern');
       }
     }
 
     const normalizedEngineTypeCode = normalizeInputText(engineTypeCode);
     if (normalizedEngineTypeCode.length > ENGINE_CODE_MAX) {
-      result.engineTypeCode = `Engine type code must be at most ${ENGINE_CODE_MAX} characters.`;
+      result.engineTypeCode = t('vehicleForm.error.engineCodeMax', { max: ENGINE_CODE_MAX });
     }
 
     return result;
-  }, [engineDisplacementCc, engineTypeCode, kw, name, plate, ps, vin, year]);
+  }, [engineDisplacementCc, engineTypeCode, kw, name, plate, ps, t, vin, year]);
 
   const isValid =
     !errors.name &&
@@ -175,7 +177,7 @@ export default function AddVehicleScreen() {
     });
 
     if (!isValid) {
-      Alert.alert('Check form', 'Please fix validation errors before saving.');
+      Alert.alert(t('common.checkFormTitle'), t('common.fixValidationErrors'));
       return;
     }
 
@@ -197,7 +199,7 @@ export default function AddVehicleScreen() {
       allowNextNavigation();
       router.back();
     } catch (error) {
-      Alert.alert('Could not save vehicle', error instanceof Error ? error.message : 'Unexpected error.');
+      Alert.alert(t('vehicleForm.alert.saveFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
     } finally {
       setSaving(false);
     }
@@ -212,21 +214,21 @@ export default function AddVehicleScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
           <SectionHeader
-            title="Add Vehicle"
-            description="Store complete vehicle identity and technical details for local-first tracking."
+            title={t('vehicleForm.title')}
+            description={t('vehicleForm.description')}
           />
 
           <Card className="gap-3">
             <FormField
-              label="Vehicle Name"
+              label={t('vehicleForm.field.name')}
               required
-              hint={`${trimmedLength(name)}/${VEHICLE_NAME_MAX}`}
+              hint={t('common.charCount', { current: trimmedLength(name), max: VEHICLE_NAME_MAX })}
               error={showError('name') ? errors.name : null}>
               <Input
                 value={name}
                 onChangeText={(value) => setName(value.replace(/\n/g, ' ').slice(0, VEHICLE_NAME_MAX))}
                 onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
-                placeholder="Ford Transit"
+                placeholder={t('vehicleForm.placeholder.name')}
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={VEHICLE_NAME_MAX}
@@ -235,15 +237,15 @@ export default function AddVehicleScreen() {
             </FormField>
 
             <FormField
-              label="License Plate"
+              label={t('vehicleForm.field.plate')}
               required
-              hint={`${trimmedLength(plate)}/${LICENSE_PLATE_MAX}`}
+              hint={t('common.charCount', { current: trimmedLength(plate), max: LICENSE_PLATE_MAX })}
               error={showError('plate') ? errors.plate : null}>
               <Input
                 value={plate}
                 onChangeText={(value) => setPlate(sanitizePlateInput(value, LICENSE_PLATE_MAX))}
                 onBlur={() => setTouched((prev) => ({ ...prev, plate: true }))}
-                placeholder="W-123AB"
+                placeholder={t('vehicleForm.placeholder.plate')}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 maxLength={LICENSE_PLATE_MAX}
@@ -251,84 +253,84 @@ export default function AddVehicleScreen() {
               />
             </FormField>
 
-            <FormField label="Make (optional)">
+            <FormField label={t('vehicleForm.field.make')}>
               <Input
                 value={make}
                 onChangeText={(value) => setMake(value.replace(/\n/g, ' ').slice(0, TEXT_MAX))}
-                placeholder="Ford"
+                placeholder={t('vehicleForm.placeholder.make')}
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={TEXT_MAX}
               />
             </FormField>
 
-            <FormField label="Model (optional)">
+            <FormField label={t('vehicleForm.field.model')}>
               <Input
                 value={model}
                 onChangeText={(value) => setModel(value.replace(/\n/g, ' ').slice(0, TEXT_MAX))}
-                placeholder="Transit Custom"
+                placeholder={t('vehicleForm.placeholder.model')}
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={TEXT_MAX}
               />
             </FormField>
 
-            <FormField label="Year (optional)" error={showError('year') ? errors.year : null}>
+            <FormField label={t('vehicleForm.field.year')} error={showError('year') ? errors.year : null}>
               <Input
                 value={year}
                 onChangeText={(value) => setYear(sanitizeIntegerInput(value, 4))}
                 onBlur={() => setTouched((prev) => ({ ...prev, year: true }))}
                 keyboardType="number-pad"
-                placeholder="2022"
+                placeholder={t('vehicleForm.placeholder.year')}
                 tone={showError('year') ? 'destructive' : 'neutral'}
               />
             </FormField>
 
             <View style={styles.rowTwoCols}>
               <View style={styles.col}>
-                <FormField label="PS (optional)" error={showError('ps') ? errors.ps : null}>
+                <FormField label={t('vehicleForm.field.ps')} error={showError('ps') ? errors.ps : null}>
                   <Input
                     value={ps}
                     onChangeText={(value) => setPs(sanitizeIntegerInput(value, 4))}
                     onBlur={() => setTouched((prev) => ({ ...prev, ps: true }))}
                     keyboardType="number-pad"
-                    placeholder="150"
+                    placeholder={t('vehicleForm.placeholder.ps')}
                     tone={showError('ps') ? 'destructive' : 'neutral'}
                   />
                 </FormField>
               </View>
 
               <View style={styles.col}>
-                <FormField label="kW (optional)" error={showError('kw') ? errors.kw : null}>
+                <FormField label={t('vehicleForm.field.kw')} error={showError('kw') ? errors.kw : null}>
                   <Input
                     value={kw}
                     onChangeText={(value) => setKw(sanitizeIntegerInput(value, 4))}
                     onBlur={() => setTouched((prev) => ({ ...prev, kw: true }))}
                     keyboardType="number-pad"
-                    placeholder="110"
+                    placeholder={t('vehicleForm.placeholder.kw')}
                     tone={showError('kw') ? 'destructive' : 'neutral'}
                   />
                 </FormField>
               </View>
             </View>
 
-            <FormField label="Hubraum ccm (optional)" error={showError('engineDisplacementCc') ? errors.engineDisplacementCc : null}>
+            <FormField label={t('vehicleForm.field.displacement')} error={showError('engineDisplacementCc') ? errors.engineDisplacementCc : null}>
               <Input
                 value={engineDisplacementCc}
                 onChangeText={(value) => setEngineDisplacementCc(sanitizeIntegerInput(value, 5))}
                 onBlur={() => setTouched((prev) => ({ ...prev, engineDisplacementCc: true }))}
                 keyboardType="number-pad"
-                placeholder="1995"
+                placeholder={t('vehicleForm.placeholder.displacement')}
                 tone={showError('engineDisplacementCc') ? 'destructive' : 'neutral'}
               />
             </FormField>
 
-            <FormField label="VIN / FIN (optional)" error={showError('vin') ? errors.vin : null}>
+            <FormField label={t('vehicleForm.field.vin')} error={showError('vin') ? errors.vin : null}>
               <Input
                 value={vin}
                 onChangeText={(value) => setVin(sanitizeVinInput(value))}
                 onBlur={() => setTouched((prev) => ({ ...prev, vin: true }))}
-                placeholder="WF0XXXXXXXXXXXXXX"
+                placeholder={t('vehicleForm.placeholder.vin')}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 maxLength={17}
@@ -337,14 +339,14 @@ export default function AddVehicleScreen() {
             </FormField>
 
             <FormField
-              label="Engine Type Code (optional)"
-              hint={`${trimmedLength(engineTypeCode)}/${ENGINE_CODE_MAX}`}
+              label={t('vehicleForm.field.engineCode')}
+              hint={t('common.charCount', { current: trimmedLength(engineTypeCode), max: ENGINE_CODE_MAX })}
               error={showError('engineTypeCode') ? errors.engineTypeCode : null}>
               <Input
                 value={engineTypeCode}
                 onChangeText={(value) => setEngineTypeCode(value.replace(/\n/g, ' ').slice(0, ENGINE_CODE_MAX))}
                 onBlur={() => setTouched((prev) => ({ ...prev, engineTypeCode: true }))}
-                placeholder="YT2Q"
+                placeholder={t('vehicleForm.placeholder.engineCode')}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 maxLength={ENGINE_CODE_MAX}
@@ -354,9 +356,9 @@ export default function AddVehicleScreen() {
           </Card>
 
           <Button
-            label="Save Vehicle"
+            label={t('vehicleForm.save')}
             loading={saving}
-            loadingLabel="Saving..."
+            loadingLabel={t('vehicleForm.saving')}
             variant="primary"
             disabled={!canSubmit}
             onPress={() => void handleSave()}

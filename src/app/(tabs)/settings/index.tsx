@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -5,22 +6,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/themed-view';
 import { ActionRow, Card, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { useI18n } from '@/hooks/use-i18n';
 
 export default function SettingsScreen() {
+  const router = useRouter();
+  const { t } = useI18n();
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.content}>
           <SectionHeader
-            title="Settings"
-            description="App preferences, privacy, and backup controls live here. Export is intentionally under Logs in MVP."
+            title={t('settings.title')}
+            description={t('settings.description')}
           />
 
           <Card className="gap-2">
-            <ActionRow label="Appearance" description="Theme mode controls are planned for MVP settings stack." disabled />
             <ActionRow
-              label="Backup and Restore"
-              description="Local backup and restore flow remains part of MVP readiness gate."
+              label={t('settings.appearance.label')}
+              description={t('settings.appearance.description')}
+              onPress={() => router.push('/settings/appearance')}
+            />
+            <ActionRow
+              label={t('settings.backup.label')}
+              description={t('settings.backup.description')}
               disabled
             />
           </Card>

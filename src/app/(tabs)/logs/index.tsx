@@ -25,6 +25,7 @@ import type {
   TripUsageFilter,
   VehicleListItem,
 } from '@/data/types';
+import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { generateLogsPdf } from '@/services/export/generate-logs-pdf';
@@ -46,26 +47,18 @@ function isValidDayDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function usageLabel(value: TripUsageFilter) {
-  if (value === 'work') {
-    return 'Work';
-  }
-  if (value === 'private') {
-    return 'Private';
-  }
-  if (value === 'unclassified') {
-    return 'Unclassified';
-  }
-
-  return 'Both';
-}
-
 const USAGE_OPTIONS: TripUsageFilter[] = ['both', 'work', 'private', 'unclassified'];
+type LogsValidationErrorKey =
+  | 'logs.validation.vehicleScopeRequired'
+  | 'logs.validation.fromDateFormat'
+  | 'logs.validation.toDateFormat'
+  | 'logs.validation.dateRange';
 
 export default function LogsScreen() {
   const router = useRouter();
   const isFocused = useIsFocused();
   const theme = useTheme();
+  const { t } = useI18n();
 
   const currentYear = new Date().getUTCFullYear();
   const yearOptions = useMemo(() => [null, currentYear, currentYear - 1, currentYear - 2], [currentYear]);
@@ -106,28 +99,30 @@ export default function LogsScreen() {
     return selectedVehicleIds;
   }, [allVehiclesScope, selectedVehicleIds]);
 
-  const validationError = useMemo(() => {
+  const validationErrorKey = useMemo<LogsValidationErrorKey | null>(() => {
     if (!allVehiclesScope && selectedVehicleIds.length === 0) {
-      return 'Select at least one vehicle or switch scope to All vehicles.';
+      return 'logs.validation.vehicleScopeRequired';
     }
 
     const trimmedFrom = fromDate.trim();
     const trimmedTo = toDate.trim();
 
     if (trimmedFrom.length > 0 && !isValidDayDate(trimmedFrom)) {
-      return 'From date must use YYYY-MM-DD.';
+      return 'logs.validation.fromDateFormat';
     }
 
     if (trimmedTo.length > 0 && !isValidDayDate(trimmedTo)) {
-      return 'To date must use YYYY-MM-DD.';
+      return 'logs.validation.toDateFormat';
     }
 
     if (trimmedFrom.length > 0 && trimmedTo.length > 0 && trimmedFrom > trimmedTo) {
-      return 'From date must be earlier than or equal to To date.';
+      return 'logs.validation.dateRange';
     }
 
     return null;
   }, [allVehiclesScope, fromDate, selectedVehicleIds.length, toDate]);
+
+  const validationError = validationErrorKey ? t(validationErrorKey) : null;
 
   const exportFilters = useMemo<Partial<LogsExportFilters>>(
     () => ({
@@ -169,9 +164,9 @@ export default function LogsScreen() {
   }, []);
 
   const loadPreview = useCallback(async () => {
-    if (validationError) {
+    if (validationErrorKey) {
       setPreviewStatus('error');
-      setPreviewError(validationError);
+      setPreviewError(t(validationErrorKey));
       setPreview(null);
       return;
     }
@@ -194,10 +189,10 @@ export default function LogsScreen() {
       }
 
       setPreviewStatus('error');
-      setPreviewError(error instanceof Error ? error.message : 'Failed to compute export preview.');
+      setPreviewError(error instanceof Error ? error.message : t('logs.preview.errorFallback'));
       setPreview(null);
     }
-  }, [exportFilters, validationError]);
+  }, [exportFilters, t, validationErrorKey]);
 
   const loadTimeline = useCallback(async () => {
     if (!showTimeline) {
@@ -207,10 +202,10 @@ export default function LogsScreen() {
       return;
     }
 
-    if (validationError) {
+    if (validationErrorKey) {
       setTimelineStatus('error');
       setTimelineEntries([]);
-      setTimelineError(validationError);
+      setTimelineError(t(validationErrorKey));
       return;
     }
 
@@ -242,9 +237,9 @@ export default function LogsScreen() {
 
       setTimelineStatus('error');
       setTimelineEntries([]);
-      setTimelineError(error instanceof Error ? error.message : 'Failed to load timeline.');
+      setTimelineError(error instanceof Error ? error.message : t('logs.timeline.errorFallback'));
     }
-  }, [fromDate, selectedIds, showTimeline, timelineSearch, toDate, usageType, validationError, year]);
+  }, [fromDate, selectedIds, showTimeline, t, timelineSearch, toDate, usageType, validationErrorKey, year]);
 
   useEffect(() => {
     if (!isFocused) {
@@ -291,8 +286,8 @@ export default function LogsScreen() {
       return;
     }
 
-    if (validationError) {
-      Alert.alert('Check filters', validationError);
+    if (validationErrorKey) {
+      Alert.alert(t('logs.alert.checkFiltersTitle'), t(validationErrorKey));
       return;
     }
 
@@ -300,12 +295,16 @@ export default function LogsScreen() {
     try {
       const result = await generateLogsPdf(exportFilters);
       Alert.alert(
-        'PDF ready',
-        `${result.fileName}\nTrips: ${result.dataset.preview.tripCount}\nFuel entries: ${result.dataset.preview.fuelCount}`,
+        t('logs.alert.pdfReadyTitle'),
+        t('logs.alert.pdfReadyMessage', {
+          fileName: result.fileName,
+          tripCount: result.dataset.preview.tripCount,
+          fuelCount: result.dataset.preview.fuelCount,
+        }),
       );
       allowNextNavigation();
     } catch (error) {
-      Alert.alert('Export failed', error instanceof Error ? error.message : 'Unexpected error while generating PDF.');
+      Alert.alert(t('logs.alert.exportFailedTitle'), error instanceof Error ? error.message : t('logs.alert.exportFailedFallback'));
     } finally {
       setExportingPdf(false);
     }
@@ -321,16 +320,18 @@ export default function LogsScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <SectionHeader
-            title="Logs Export"
-            description="Export-first workbench. Timeline browsing stays available below as a secondary section."
+            title={t('logs.title')}
+            description={t('logs.description')}
           />
 
           <Card className="gap-3">
-            <FormField label="Vehicle Scope" error={validationError?.includes('Select at least one vehicle') ? validationError : null}>
+            <FormField
+              label={t('logs.field.vehicleScope')}
+              error={validationErrorKey === 'logs.validation.vehicleScopeRequired' ? validationError : null}>
               <SelectField
                 options={[
-                  { value: 'all', label: 'All vehicles' },
-                  { value: 'selected', label: 'Select vehicles' },
+                  { value: 'all', label: t('logs.option.allVehicles') },
+                  { value: 'selected', label: t('logs.option.selectVehicles') },
                 ]}
                 value={allVehiclesScope ? 'all' : 'selected'}
                 onChange={(value) => setAllVehiclesScope(value === 'all')}
@@ -338,11 +339,11 @@ export default function LogsScreen() {
             </FormField>
 
             {!allVehiclesScope ? (
-              <FormField label="Vehicles" required>
+              <FormField label={t('logs.field.vehicles')} required>
                 {vehiclesStatus === 'loading' ? (
-                  <Input value="Loading vehicles..." editable={false} variant="subtle" />
+                  <Input value={t('common.loadingVehicles')} editable={false} variant="subtle" />
                 ) : vehicles.length === 0 ? (
-                  <EmptyState title="No vehicles found" description="Add vehicles before exporting scoped datasets." />
+                  <EmptyState title={t('logs.scope.noVehicles')} description={t('logs.scope.noVehiclesDescription')} />
                 ) : (
                   <SelectField
                     multi
@@ -354,11 +355,11 @@ export default function LogsScreen() {
               </FormField>
             ) : null}
 
-            <FormField label="Period">
+            <FormField label={t('logs.field.period')}>
               <SelectField
                 options={yearOptions.map((option) => ({
                   value: option === null ? 'all' : String(option),
-                  label: option === null ? 'All dates' : String(option),
+                  label: option === null ? t('common.allDates') : String(option),
                 }))}
                 value={yearValue}
                 onChange={(value) => {
@@ -376,8 +377,8 @@ export default function LogsScreen() {
             <View style={styles.rowTwoCols}>
               <View style={styles.col}>
                 <FormField
-                  label="From (optional)"
-                  error={validationError?.includes('From date') ? validationError : null}>
+                  label={t('logs.field.fromDate')}
+                  error={validationErrorKey === 'logs.validation.fromDateFormat' ? validationError : null}>
                   <DateTimeField
                     mode="date"
                     value={fromDate}
@@ -387,16 +388,20 @@ export default function LogsScreen() {
                         setYear(null);
                       }
                     }}
-                    placeholder="2026-01-01"
-                    tone={validationError?.includes('From date') ? 'destructive' : 'neutral'}
+                    placeholder={t('logs.placeholder.fromDate')}
+                    tone={validationErrorKey === 'logs.validation.fromDateFormat' ? 'destructive' : 'neutral'}
                   />
                 </FormField>
               </View>
 
               <View style={styles.col}>
                 <FormField
-                  label="To (optional)"
-                  error={validationError && !validationError.includes('Select at least one vehicle') && !validationError.includes('From date') ? validationError : null}>
+                  label={t('logs.field.toDate')}
+                  error={
+                    validationErrorKey === 'logs.validation.toDateFormat' || validationErrorKey === 'logs.validation.dateRange'
+                      ? validationError
+                      : null
+                  }>
                   <DateTimeField
                     mode="date"
                     value={toDate}
@@ -406,11 +411,9 @@ export default function LogsScreen() {
                         setYear(null);
                       }
                     }}
-                    placeholder="2026-12-31"
+                    placeholder={t('logs.placeholder.toDate')}
                     tone={
-                      validationError &&
-                      !validationError.includes('Select at least one vehicle') &&
-                      !validationError.includes('From date')
+                      validationErrorKey === 'logs.validation.toDateFormat' || validationErrorKey === 'logs.validation.dateRange'
                         ? 'destructive'
                         : 'neutral'
                     }
@@ -419,20 +422,30 @@ export default function LogsScreen() {
               </View>
             </View>
 
-            <FormField label="Trip Usage Filter">
+            <FormField label={t('logs.field.usageType')}>
               <SelectField
-                options={USAGE_OPTIONS.map((value) => ({ value, label: usageLabel(value) }))}
+                options={USAGE_OPTIONS.map((value) => ({
+                  value,
+                  label:
+                    value === 'work'
+                      ? t('logs.option.usageWork')
+                      : value === 'private'
+                        ? t('logs.option.usagePrivate')
+                        : value === 'unclassified'
+                          ? t('logs.option.usageUnclassified')
+                          : t('logs.option.usageBoth'),
+                }))}
                 value={usageType}
                 onChange={(value) => setUsageType(value as TripUsageFilter)}
               />
             </FormField>
 
-            <FormField label="Data Scope">
+            <FormField label={t('logs.field.dataScope')}>
               <SelectField
                 multi
                 options={[
-                  { value: 'fuel', label: 'Include fuel entries' },
-                  { value: 'receipts', label: 'Include receipt appendix' },
+                  { value: 'fuel', label: t('logs.option.includeFuel') },
+                  { value: 'receipts', label: t('logs.option.includeReceipts') },
                 ]}
                 values={dataScopeValues}
                 onToggle={(value) => {
@@ -447,27 +460,27 @@ export default function LogsScreen() {
             </FormField>
 
             <Card variant="outline" className="gap-1.5">
-              <Text className="text-sm font-semibold text-text dark:text-dark-text">Live Export Preview</Text>
+              <Text className="text-sm font-semibold text-text dark:text-dark-text">{t('logs.preview.title')}</Text>
               {previewStatus === 'loading' ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator color={theme.textSecondary} />
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Calculating export scope...</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.calculating')}</Text>
                 </View>
               ) : previewStatus === 'error' || !preview ? (
                 <Text className="text-xs text-destructive dark:text-dark-destructive">
-                  {previewError ?? 'Could not build preview.'}
+                  {previewError ?? t('logs.preview.errorFallback')}
                 </Text>
               ) : (
                 <View style={styles.previewGrid}>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Vehicles: {preview.vehicleCount}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Trips: {preview.tripCount}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Fuel entries: {preview.fuelCount}</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Total distance: {preview.totalDistanceKm} km</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Work distance: {preview.businessDistanceKm} km</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Private distance: {preview.privateDistanceKm} km</Text>
-                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Unclassified: {preview.unclassifiedDistanceKm} km</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.vehicleCount', { value: preview.vehicleCount })}</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.tripCount', { value: preview.tripCount })}</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.fuelCount', { value: preview.fuelCount })}</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.totalDistance', { value: preview.totalDistanceKm })}</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.workDistance', { value: preview.businessDistanceKm })}</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.privateDistance', { value: preview.privateDistanceKm })}</Text>
+                  <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.preview.unclassifiedDistance', { value: preview.unclassifiedDistanceKm })}</Text>
                   <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
-                    Fuel spend: EUR {preview.fuelSpendTotal.toFixed(2)}
+                    {t('logs.preview.fuelSpend', { value: preview.fuelSpendTotal.toFixed(2) })}
                   </Text>
                 </View>
               )}
@@ -475,28 +488,28 @@ export default function LogsScreen() {
 
             <Button
               variant="primary"
-              label={exportingPdf ? 'Generating PDF...' : 'Generate PDF Export'}
+              label={exportingPdf ? t('logs.generatingPdf') : t('logs.generatePdf')}
               onPress={() => void handleGeneratePdf()}
-              disabled={exportingPdf || Boolean(validationError)}
+              disabled={exportingPdf || Boolean(validationErrorKey)}
             />
           </Card>
 
           <Card className="gap-2">
             <SectionHeader
-              title="Timeline"
-              description="Secondary detail-level navigation inside Logs."
-              actionLabel={showTimeline ? 'Hide' : 'Show'}
+              title={t('logs.timeline.title')}
+              description={t('logs.timeline.description')}
+              actionLabel={showTimeline ? t('logs.timeline.hide') : t('logs.timeline.show')}
               onAction={() => setShowTimeline((current) => !current)}
               className="mb-1"
             />
 
             {showTimeline ? (
               <>
-                <FormField label="Search Timeline">
+                <FormField label={t('logs.timeline.searchLabel')}>
                   <Input
                     value={timelineSearch}
                     onChangeText={setTimelineSearch}
-                    placeholder="Search timeline"
+                    placeholder={t('logs.timeline.searchPlaceholder')}
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
@@ -505,19 +518,19 @@ export default function LogsScreen() {
                 {timelineStatus === 'loading' ? (
                   <View style={styles.loadingRow}>
                     <ActivityIndicator color={theme.textSecondary} />
-                    <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">Loading timeline...</Text>
+                    <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">{t('logs.timeline.loading')}</Text>
                   </View>
                 ) : timelineStatus === 'error' ? (
                   <Text className="text-xs text-destructive dark:text-dark-destructive">
-                    {timelineError ?? 'Could not load timeline.'}
+                    {timelineError ?? t('logs.timeline.errorFallback')}
                   </Text>
                 ) : timelineEntries.length === 0 ? (
-                  <EmptyState title="No matching timeline entries" description="Adjust filters or search terms." />
+                  <EmptyState title={t('logs.timeline.emptyTitle')} description={t('logs.timeline.emptyDescription')} />
                 ) : (
                   timelineEntries.map((entry) => (
                     <ListRow
                       key={entry.id}
-                      title={entry.type === 'trip' ? 'Trip' : 'Fuel'}
+                      title={entry.type === 'trip' ? t('logs.timeline.entryTypeTrip') : t('logs.timeline.entryTypeFuel')}
                       subtitle={`${entry.vehicleName} | ${entry.summary}`}
                       meta={formatDate(entry.date)}
                       onPress={() =>
@@ -532,7 +545,7 @@ export default function LogsScreen() {
               </>
             ) : (
               <Text className="text-xs text-textSecondary dark:text-dark-textSecondary">
-                Open this section when you need detail-level entry navigation.
+                {t('logs.timeline.hiddenHint')}
               </Text>
             )}
           </Card>
@@ -540,7 +553,7 @@ export default function LogsScreen() {
           {vehiclesStatus === 'error' ? (
             <Card tone="warning">
               <Text className="text-xs text-warning dark:text-dark-warning">
-                Vehicles could not be loaded. Export scope may be incomplete.
+                {t('logs.warning.vehiclesLoad')}
               </Text>
             </Card>
           ) : null}

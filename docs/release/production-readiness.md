@@ -1,6 +1,6 @@
 # FleetFuel MVP Production Readiness Gate
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
 ## Purpose
 
@@ -39,6 +39,11 @@ Define a binary release gate for FleetFuel MVP. MVP ships only when all must-hav
 - [ ] PASS: Required loading, empty, and error states exist on all core screens.
   Exit criteria:
   - Dashboard, Vehicles, Vehicle Detail, Logs, Add Trip, Add Fuel, Logs Export, and Settings are covered.
+- [ ] PASS: Appearance preferences are fully functional from Settings.
+  Exit criteria:
+  - `Settings -> Appearance` allows `system|light|dark` and `en|de`.
+  - Theme and language changes apply immediately.
+  - Preferences persist after app restart.
 - [ ] PASS: Permission-denied paths provide useful guidance.
   Exit criteria:
   - Camera/photo/file-denied flows explain next steps.
@@ -87,6 +92,8 @@ Define a binary release gate for FleetFuel MVP. MVP ships only when all must-hav
 - [ ] PASS: Logs timeline and Logs Export flow.
 - [ ] PASS: Backup and restore flow.
 - [ ] PASS: Theme check (light/dark consistency).
+- [ ] PASS: Appearance mode check (`system`, `light`, `dark`) across iOS and Android.
+- [ ] PASS: Language check (`en`, `de`) for tabs, settings, add forms, and logs export labels/alerts.
 - [ ] PASS: iOS navigation checks (header spacing, swipe-back, no dead-end flows).
 
 ## Deferred Scope (Not a Release Blocker for MVP)
