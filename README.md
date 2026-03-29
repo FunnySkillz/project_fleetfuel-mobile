@@ -1,56 +1,108 @@
-# Welcome to your Expo app 👋
+# FleetFuel Mobile (MVP)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+FleetFuel is a mobile-first, local-first/offline-first app for tracking:
 
-## Get started
+- vehicles
+- trips
+- fuel entries
+- receipt attachments (photo/image/pdf)
+- logs export
+- backup/restore
+
+MVP is intentionally backend-free. No sync, no roles, no company/admin workflows.
+
+## Current MVP scope
+
+Implemented core navigation and workflows:
+
+- Root tabs: `Dashboard | Vehicles | Add | Logs | Settings`
+- Add actions: `Add Trip`, `Add Fuel`, `Add Vehicle`
+- Vehicle insight screen with KPI summaries and recent trips
+- Logs export workbench with filters (vehicle/date/usage/fuel-type)
+- PDF export generation from local data
+- Settings:
+  - Appearance (`system | light | dark`)
+  - Language (`en | de`)
+  - Backup and Restore
+
+Data safety/hardening implemented:
+
+- SQLite local persistence with migrations
+- Startup DB health gate + recovery path
+- Backup format: ZIP + manifest + payloads (DB/receipts/preferences)
+- Restore strategy: preflight validation + full replace
+- Receipt orphan scan and manual cleanup action
+
+## Tech stack
+
+- React Native + Expo + Expo Router
+- TypeScript
+- NativeWind/Tailwind utilities + shared shadcn-style UI primitives
+- Expo SQLite for local persistence
+- Vitest (logic-first test baseline)
+
+## Project structure
+
+- App routes: `src/app`
+- Data layer: `src/data`
+- UI primitives: `src/components/ui`
+- Services: `src/services`
+- Preferences/i18n: `src/preferences`, `src/providers`, `src/i18n`
+- Product/engineering docs: `docs/`
+
+## Getting started
 
 1. Install dependencies
 
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
 2. Start the app
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
 ```bash
-npm run reset-project
+npm run start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Useful launch commands:
 
-### Other setup steps
+```bash
+npm run ios
+npm run android
+npm run web
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Quality commands
 
-## Learn more
+```bash
+npm run lint
+npm test
+npx tsc --noEmit
+npx expo export --platform web --clear
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Scripts
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- `npm run start` - start Expo
+- `npm run ios` - run iOS target
+- `npm run android` - run Android target
+- `npm run web` - run web target
+- `npm run lint` - run Expo ESLint
+- `npm test` - run Vitest suite
+- `npm run reset-project` - reset scaffold utility from template
 
-## Join the community
+## Platform notes
 
-Join our community of developers creating universal apps.
+- Primary target is iOS/Android (mobile-first).
+- SQLite-backed data features are designed for mobile runtime.
+- Web export build is available for CI/static checks, but local DB features are not intended as a full web product in MVP.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Documentation
+
+Key internal docs:
+
+- `docs/product/mvp-definition.md`
+- `docs/design/navigation-layout-qa.md`
+- `docs/release/production-readiness.md`
+- `docs/project/lessons-learned-v1.md`
+- `docs/design/design-system-direction.md`
