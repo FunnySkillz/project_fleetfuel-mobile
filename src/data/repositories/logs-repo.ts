@@ -53,6 +53,7 @@ type FuelExportRow = {
   id: string;
   vehicle_id: string;
   occurred_at: string;
+  fuel_type: ExportFuelRow['fuelType'];
   liters: number;
   total_price: number;
   station: string;
@@ -81,6 +82,7 @@ type NormalizedExportFilters = {
   toIso: string | null;
   year: number | null;
   usageType: TripUsageFilter;
+  fuelType: LogsExportFilters['fuelType'];
   includeFuel: boolean;
   includeReceipts: boolean;
 };
@@ -251,6 +253,7 @@ function mapFuelExportRow(row: FuelExportRow): ExportFuelRow {
     id: row.id,
     vehicleId: row.vehicle_id,
     occurredAt: row.occurred_at,
+    fuelType: row.fuel_type,
     liters: row.liters,
     totalPrice: row.total_price,
     station: row.station,
@@ -308,9 +311,22 @@ function toExportFilters(filters: NormalizedExportFilters): LogsExportFilters {
     toDate: filters.toDate,
     year: filters.year,
     usageType: filters.usageType,
+    fuelType: filters.fuelType,
     includeFuel: filters.includeFuel,
     includeReceipts: filters.includeReceipts,
   };
+}
+
+function normalizeFuelTypeFilter(value: LogsExportFilters['fuelType'] | null | undefined): LogsExportFilters['fuelType'] {
+  if (!value || value === 'all') {
+    return 'all';
+  }
+
+  if (['petrol', 'diesel', 'electric', 'hybrid', 'lpg', 'cng', 'other'].includes(value)) {
+    return value;
+  }
+
+  throw new Error('Unsupported fuel type filter.');
 }
 
 async function resolveVehicleScope(db: Awaited<ReturnType<typeof getDatabase>>, vehicleIds: string[]): Promise<VehicleScopeRow[]> {
@@ -380,6 +396,10 @@ async function queryFuelForExport(
 
   appendVehicleScopeClause(whereClauses, params, filters.vehicleIds, 'f.vehicle_id');
   appendDateRangeClause(whereClauses, params, filters.fromIso, filters.toIso, 'f.occurred_at');
+  if (filters.fuelType !== 'all') {
+    whereClauses.push('f.fuel_type = ?');
+    params.push(filters.fuelType);
+  }
 
   const rows = await db.getAllAsync<FuelExportRow>(
     `
@@ -387,6 +407,7 @@ async function queryFuelForExport(
         f.id,
         f.vehicle_id,
         f.occurred_at,
+        f.fuel_type,
         f.liters,
         f.total_price,
         f.station,
@@ -510,6 +531,7 @@ function normalizeExportFilters(input: Partial<LogsExportFilters> = {}): Normali
     toIso: dateRange.toIso,
     year: dateRange.year,
     usageType: normalizeUsageType(input.usageType),
+    fuelType: normalizeFuelTypeFilter(input.fuelType),
     includeFuel: input.includeFuel ?? true,
     includeReceipts: input.includeReceipts ?? false,
   };

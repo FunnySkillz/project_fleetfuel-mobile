@@ -64,6 +64,24 @@ function tripMarker(tag: ExportTripRow['privateTag']) {
   return 'Unclassified';
 }
 
+function fuelTypeLabel(value: ExportFuelRow['fuelType']) {
+  if (!value) {
+    return 'Unspecified';
+  }
+
+  const labels: Record<NonNullable<ExportFuelRow['fuelType']>, string> = {
+    petrol: 'Petrol',
+    diesel: 'Diesel',
+    electric: 'Electric',
+    hybrid: 'Hybrid',
+    lpg: 'LPG',
+    cng: 'CNG',
+    other: 'Other',
+  };
+
+  return labels[value];
+}
+
 function dateRangeLabel(filters: LogsExportFilters) {
   if (filters.fromDate || filters.toDate) {
     return `${filters.fromDate ?? 'start'}_to_${filters.toDate ?? 'now'}`;
@@ -127,6 +145,7 @@ function renderFuelTableRows(fuelEntries: ExportFuelRow[]) {
       (fuel) => `
       <tr>
         <td>${escapeHtml(formatDate(fuel.occurredAt))}</td>
+        <td>${escapeHtml(fuelTypeLabel(fuel.fuelType))}</td>
         <td>${escapeHtml(fuel.station)}</td>
         <td>${fuel.liters.toFixed(2)} L</td>
         <td>${escapeHtml(formatCurrency(fuel.totalPrice))}</td>
@@ -176,6 +195,7 @@ function renderVehicleSection(section: ExportVehicleSection, includeFuel: boolea
         <thead>
           <tr>
             <th>Date</th>
+            <th>Fuel type</th>
             <th>Station</th>
             <th>Liters</th>
             <th>Total</th>
@@ -237,6 +257,7 @@ function renderDatasetHtml(dataset: LogsExportDataset) {
   const filterSummary = [
     `Generated: ${formatDateTime(dataset.generatedAt)}`,
     `Usage scope: ${usageLabel(dataset.filters.usageType)}`,
+    `Fuel type scope: ${dataset.filters.fuelType === 'all' ? 'All fuel types' : fuelTypeLabel(dataset.filters.fuelType)}`,
     `Vehicles: ${dataset.filters.vehicleIds.length === 0 ? 'All vehicles' : `${dataset.filters.vehicleIds.length} selected`}`,
     `Date scope: ${dataset.filters.fromDate || dataset.filters.toDate ? `${dataset.filters.fromDate ?? 'start'} -> ${dataset.filters.toDate ?? 'now'}` : dataset.filters.year ? `Year ${dataset.filters.year}` : 'All dates'}`,
     `Include fuel entries: ${dataset.filters.includeFuel ? 'Yes' : 'No'}`,
@@ -290,6 +311,15 @@ function renderDatasetHtml(dataset: LogsExportDataset) {
   `;
 }
 
+function getExportDirectory() {
+  const baseDir = FileSystem.documentDirectory;
+  if (!baseDir) {
+    throw new Error('Document directory is unavailable for PDF export.');
+  }
+
+  return `${baseDir}exports`;
+}
+
 export async function generateLogsPdf(
   filters: Partial<LogsExportFilters> = {},
 ): Promise<{ uri: string; fileName: string; dataset: LogsExportDataset }> {
@@ -298,13 +328,9 @@ export async function generateLogsPdf(
   const fileName = buildFileName(dataset);
 
   const generated = await Print.printToFileAsync({ html });
-
-  const baseDir = FileSystem.cacheDirectory;
-  if (!baseDir) {
-    throw new Error('Cache directory is unavailable for PDF export.');
-  }
-
-  const targetUri = `${baseDir}${fileName}`;
+  const exportDir = getExportDirectory();
+  await FileSystem.makeDirectoryAsync(exportDir, { intermediates: true });
+  const targetUri = `${exportDir}/${fileName}`;
   await FileSystem.copyAsync({ from: generated.uri, to: targetUri });
 
   if (await Sharing.isAvailableAsync()) {
