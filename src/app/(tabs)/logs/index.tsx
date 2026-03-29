@@ -21,6 +21,7 @@ import { logsRepo, vehiclesRepo } from '@/data/repositories';
 import type {
   EntrySummary,
   ExportPreview,
+  FuelTypeFilter,
   LogsExportFilters,
   TripUsageFilter,
   VehicleListItem,
@@ -73,6 +74,7 @@ export default function LogsScreen() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [usageType, setUsageType] = useState<TripUsageFilter>('both');
+  const [fuelType, setFuelType] = useState<FuelTypeFilter>('all');
   const [includeFuel, setIncludeFuel] = useState(true);
   const [includeReceipts, setIncludeReceipts] = useState(false);
 
@@ -131,10 +133,11 @@ export default function LogsScreen() {
       toDate: toDate.trim() || null,
       year,
       usageType,
+      fuelType,
       includeFuel,
       includeReceipts,
     }),
-    [fromDate, includeFuel, includeReceipts, selectedIds, toDate, usageType, year],
+    [fromDate, fuelType, includeFuel, includeReceipts, selectedIds, toDate, usageType, year],
   );
 
   const isDirty =
@@ -144,6 +147,7 @@ export default function LogsScreen() {
     fromDate.trim().length > 0 ||
     toDate.trim().length > 0 ||
     usageType !== 'both' ||
+    fuelType !== 'all' ||
     !includeFuel ||
     includeReceipts ||
     exportingPdf;
@@ -298,6 +302,7 @@ export default function LogsScreen() {
         t('logs.alert.pdfReadyTitle'),
         t('logs.alert.pdfReadyMessage', {
           fileName: result.fileName,
+          uri: result.uri,
           tripCount: result.dataset.preview.tripCount,
           fuelCount: result.dataset.preview.fuelCount,
         }),
@@ -437,6 +442,23 @@ export default function LogsScreen() {
                 }))}
                 value={usageType}
                 onChange={(value) => setUsageType(value as TripUsageFilter)}
+              />
+            </FormField>
+
+            <FormField label={t('logs.field.fuelType')}>
+              <SelectField
+                options={[
+                  { value: 'all', label: t('logs.option.fuelTypeAll') },
+                  { value: 'petrol', label: t('logs.option.fuelTypePetrol') },
+                  { value: 'diesel', label: t('logs.option.fuelTypeDiesel') },
+                  { value: 'electric', label: t('logs.option.fuelTypeElectric') },
+                  { value: 'hybrid', label: t('logs.option.fuelTypeHybrid') },
+                  { value: 'lpg', label: t('logs.option.fuelTypeLpg') },
+                  { value: 'cng', label: t('logs.option.fuelTypeCng') },
+                  { value: 'other', label: t('logs.option.fuelTypeOther') },
+                ]}
+                value={fuelType}
+                onChange={(value) => setFuelType(value as FuelTypeFilter)}
               />
             </FormField>
 

@@ -10,7 +10,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Button, Card, EmptyState, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, fuelRepo, vehiclesRepo } from '@/data/repositories';
-import type { ReceiptAttachment, VehicleListItem } from '@/data/types';
+import type { FuelType, ReceiptAttachment, VehicleListItem } from '@/data/types';
 import { useI18n } from '@/hooks/use-i18n';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import {
@@ -35,6 +35,7 @@ const ODOMETER_DIGITS = 7;
 
 type FuelFormErrors = {
   vehicleId?: string;
+  fuelType?: string;
   liters?: string;
   price?: string;
   station?: string;
@@ -79,6 +80,7 @@ export default function AddFuelEntryScreen() {
   const [price, setPrice] = useState('');
   const [station, setStation] = useState('');
   const [odometer, setOdometer] = useState('');
+  const [fuelType, setFuelType] = useState<FuelType | null>(null);
   const [notes, setNotes] = useState('');
   const [receipt, setReceipt] = useState<ReceiptAttachment | null>(null);
 
@@ -87,6 +89,7 @@ export default function AddFuelEntryScreen() {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [touched, setTouched] = useState({
     vehicleId: false,
+    fuelType: false,
     liters: false,
     price: false,
     station: false,
@@ -196,6 +199,7 @@ export default function AddFuelEntryScreen() {
 
   const isDirty = useMemo(
     () =>
+      fuelType !== null ||
       liters.trim().length > 0 ||
       price.trim().length > 0 ||
       station.trim().length > 0 ||
@@ -203,7 +207,7 @@ export default function AddFuelEntryScreen() {
       receipt !== null ||
       saving ||
       attachmentBusy,
-    [attachmentBusy, liters, notes, price, receipt, saving, station],
+    [attachmentBusy, fuelType, liters, notes, price, receipt, saving, station],
   );
   const { allowNextNavigation } = useUnsavedChangesGuard(isDirty);
 
@@ -212,6 +216,10 @@ export default function AddFuelEntryScreen() {
 
     if (!selectedVehicleId) {
       result.vehicleId = t('fuelForm.error.vehicleRequired');
+    }
+
+    if (!fuelType) {
+      result.fuelType = t('fuelForm.error.fuelTypeRequired');
     }
 
     if (liters.trim().length === 0) {
@@ -260,10 +268,17 @@ export default function AddFuelEntryScreen() {
     }
 
     return result;
-  }, [latestRecordedKm, liters, litersValue, notes, odometer, odometerValue, price, priceValue, receipt, selectedVehicleId, station, t]);
+  }, [fuelType, latestRecordedKm, liters, litersValue, notes, odometer, odometerValue, price, priceValue, receipt, selectedVehicleId, station, t]);
 
   const isValid =
-    !errors.vehicleId && !errors.liters && !errors.price && !errors.station && !errors.odometer && !errors.notes && !errors.receipt;
+    !errors.vehicleId &&
+    !errors.fuelType &&
+    !errors.liters &&
+    !errors.price &&
+    !errors.station &&
+    !errors.odometer &&
+    !errors.notes &&
+    !errors.receipt;
 
   const canSubmit = isValid && !saving && !attachmentBusy;
   const showError = (field: keyof typeof touched) => (submitAttempted || touched[field]) && Boolean(errors[field]);
@@ -276,6 +291,7 @@ export default function AddFuelEntryScreen() {
     setSubmitAttempted(true);
     setTouched({
       vehicleId: true,
+      fuelType: true,
       liters: true,
       price: true,
       station: true,
@@ -293,6 +309,7 @@ export default function AddFuelEntryScreen() {
     try {
       await fuelRepo.create({
         vehicleId: selectedVehicleId,
+        fuelType,
         liters: litersValue,
         totalPrice: priceValue,
         station: normalizeText(station),
@@ -475,6 +492,28 @@ export default function AddFuelEntryScreen() {
                   onAction={() => router.push('/vehicles/new')}
                 />
               )}
+            </FormField>
+
+            <FormField
+              label={t('fuelForm.field.fuelType')}
+              required
+              error={showError('fuelType') ? errors.fuelType : null}>
+              <SelectField
+                options={[
+                  { value: 'petrol', label: t('fuelForm.fuelType.petrol') },
+                  { value: 'diesel', label: t('fuelForm.fuelType.diesel') },
+                  { value: 'electric', label: t('fuelForm.fuelType.electric') },
+                  { value: 'hybrid', label: t('fuelForm.fuelType.hybrid') },
+                  { value: 'lpg', label: t('fuelForm.fuelType.lpg') },
+                  { value: 'cng', label: t('fuelForm.fuelType.cng') },
+                  { value: 'other', label: t('fuelForm.fuelType.other') },
+                ]}
+                value={fuelType}
+                onChange={(value) => {
+                  setFuelType(value as FuelType);
+                  setTouched((prev) => ({ ...prev, fuelType: true }));
+                }}
+              />
             </FormField>
 
             <FormField
