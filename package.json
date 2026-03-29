@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@react-native-async-storage/async-storage": "^3.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.15.5",
     "@react-navigation/elements": "^2.9.10",
     "@react-navigation/native": "^7.1.33",
@@ -58,7 +58,7 @@
     "@types/jszip": "^3.4.0",
     "@types/react": "~19.2.2",
     "eslint": "^9.39.4",
-    "eslint-config-expo": "^55.0.1-canary-20260328-bdc6273",
+    "eslint-config-expo": "^55.0.1-canary-20260327-0789fbc",
     "typescript": "~5.9.2",
     "vitest": "^4.1.2"
   },
