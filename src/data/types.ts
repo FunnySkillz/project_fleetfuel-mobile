@@ -2,6 +2,8 @@ export type EntryType = 'trip' | 'fuel';
 export type TripClassification = 'private' | 'business';
 export type TripPrivateTag = TripClassification | null;
 export type TripUsageFilter = 'both' | 'work' | 'private' | 'unclassified';
+export type FuelType = 'petrol' | 'diesel' | 'electric' | 'hybrid' | 'lpg' | 'cng' | 'other';
+export type FuelTypeFilter = FuelType | 'all';
 
 export type ReceiptAttachment = {
   uri: string;
@@ -53,6 +55,7 @@ export type FuelEntryRecord = {
   id: string;
   vehicleId: string;
   occurredAt: string;
+  fuelType: FuelType | null;
   liters: number;
   totalPrice: number;
   station: string;
@@ -94,6 +97,7 @@ export type LogsExportFilters = {
   toDate: string | null;
   year: number | null;
   usageType: TripUsageFilter;
+  fuelType: FuelTypeFilter;
   includeFuel: boolean;
   includeReceipts: boolean;
 };
@@ -130,6 +134,7 @@ export type ExportFuelRow = {
   id: string;
   vehicleId: string;
   occurredAt: string;
+  fuelType: FuelType | null;
   liters: number;
   totalPrice: number;
   station: string;
@@ -229,6 +234,7 @@ export type FuelEntryDetail = {
   vehicleId: string;
   vehicleName: string;
   occurredAt: string;
+  fuelType: FuelType | null;
   liters: number;
   totalPrice: number;
   station: string;

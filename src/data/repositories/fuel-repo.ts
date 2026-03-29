@@ -2,7 +2,7 @@ import type * as SQLite from 'expo-sqlite';
 
 import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { createId, nowIso } from '@/data/db-utils';
-import type { FuelEntryRecord, ReceiptAttachment } from '@/data/types';
+import type { FuelEntryRecord, FuelType, ReceiptAttachment } from '@/data/types';
 
 import { normalizeOptionalText, normalizeRequiredText } from './shared';
 
@@ -12,11 +12,13 @@ const STATION_MIN = 2;
 const STATION_MAX = 80;
 const NOTES_MAX = 500;
 const ODOMETER_MAX = 9_999_999;
+const FUEL_TYPES = new Set<FuelType>(['petrol', 'diesel', 'electric', 'hybrid', 'lpg', 'cng', 'other']);
 
 type FuelRow = {
   id: string;
   vehicle_id: string;
   occurred_at: string;
+  fuel_type: FuelType | null;
   liters: number;
   total_price: number;
   station: string;
@@ -33,6 +35,7 @@ type FuelRow = {
 type FuelCreateInput = {
   vehicleId: string;
   occurredAt?: string | null;
+  fuelType?: FuelType | null;
   liters: number;
   totalPrice: number;
   station: string;
@@ -46,6 +49,7 @@ function mapFuelRecord(row: FuelRow): FuelEntryRecord {
     id: row.id,
     vehicleId: row.vehicle_id,
     occurredAt: row.occurred_at,
+    fuelType: row.fuel_type,
     liters: row.liters,
     totalPrice: row.total_price,
     station: row.station,
@@ -138,6 +142,18 @@ function normalizeReceipt(value: ReceiptAttachment | null | undefined): ReceiptA
   };
 }
 
+function normalizeFuelType(value: FuelType | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (FUEL_TYPES.has(value)) {
+    return value;
+  }
+
+  throw new Error('Fuel type is invalid.');
+}
+
 async function ensureVehicleExists(db: SQLite.SQLiteDatabase, vehicleId: string) {
   const vehicle = await db.getFirstAsync<{ id: string }>(
     `
@@ -162,6 +178,7 @@ async function getFuelRowById(db: SQLite.SQLiteDatabase, id: string) {
         id,
         vehicle_id,
         occurred_at,
+        fuel_type,
         liters,
         total_price,
         station,
@@ -255,6 +272,7 @@ function normalizeCreateInput(input: FuelCreateInput) {
   return {
     vehicleId: input.vehicleId,
     occurredAt: normalizeOccurredAt(input.occurredAt),
+    fuelType: normalizeFuelType(input.fuelType),
     liters: normalizePositiveNumber(input.liters, 'Liters', LITERS_MAX),
     totalPrice: normalizePositiveNumber(input.totalPrice, 'Total price', PRICE_MAX),
     station: normalizeStation(input.station),
@@ -273,6 +291,7 @@ export const fuelRepo = {
           id,
           vehicle_id,
           occurred_at,
+          fuel_type,
           liters,
           total_price,
           station,
@@ -328,6 +347,7 @@ export const fuelRepo = {
             id,
             vehicle_id,
             occurred_at,
+            fuel_type,
             liters,
             total_price,
             station,
@@ -341,12 +361,13 @@ export const fuelRepo = {
             updated_at,
             deleted_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         `,
         [
           id,
           normalized.vehicleId,
           normalized.occurredAt,
+          normalized.fuelType,
           normalized.liters,
           normalized.totalPrice,
           normalized.station,
@@ -365,6 +386,7 @@ export const fuelRepo = {
         id,
         vehicleId: normalized.vehicleId,
         occurredAt: normalized.occurredAt,
+        fuelType: normalized.fuelType,
         liters: normalized.liters,
         totalPrice: normalized.totalPrice,
         station: normalized.station,
@@ -393,6 +415,7 @@ export const fuelRepo = {
       const normalized = normalizeCreateInput({
         vehicleId: patch.vehicleId ?? current.vehicle_id,
         occurredAt: patch.occurredAt ?? current.occurred_at,
+        fuelType: patch.fuelType ?? current.fuel_type,
         liters: patch.liters ?? current.liters,
         totalPrice: patch.totalPrice ?? current.total_price,
         station: patch.station ?? current.station,
@@ -425,6 +448,7 @@ export const fuelRepo = {
           UPDATE fuel_entries
           SET vehicle_id = ?,
               occurred_at = ?,
+              fuel_type = ?,
               liters = ?,
               total_price = ?,
               station = ?,
@@ -441,6 +465,7 @@ export const fuelRepo = {
         [
           normalized.vehicleId,
           normalized.occurredAt,
+          normalized.fuelType,
           normalized.liters,
           normalized.totalPrice,
           normalized.station,
@@ -459,6 +484,7 @@ export const fuelRepo = {
         id,
         vehicleId: normalized.vehicleId,
         occurredAt: normalized.occurredAt,
+        fuelType: normalized.fuelType,
         liters: normalized.liters,
         totalPrice: normalized.totalPrice,
         station: normalized.station,
@@ -492,5 +518,20 @@ export const fuelRepo = {
         throw new Error('Fuel entry not found.');
       }
     });
+  },
+
+  async listActiveReceiptUris(): Promise<string[]> {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<{ receipt_uri: string }>(
+      `
+        SELECT DISTINCT receipt_uri
+        FROM fuel_entries
+        WHERE deleted_at IS NULL
+          AND receipt_uri IS NOT NULL
+          AND receipt_uri <> ''
+      `,
+    );
+
+    return rows.map((row) => row.receipt_uri);
   },
 };

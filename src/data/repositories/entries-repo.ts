@@ -2,7 +2,7 @@ import type * as SQLite from 'expo-sqlite';
 
 import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { nowIso } from '@/data/db-utils';
-import type { EntryDetail, TripPrivateTag } from '@/data/types';
+import type { EntryDetail, FuelEntryDetail, TripPrivateTag } from '@/data/types';
 
 import { assertRequiredPrivateTag, normalizeOptionalText } from './shared';
 
@@ -30,6 +30,7 @@ type FuelDetailRow = {
   vehicle_id: string;
   vehicle_name: string;
   occurred_at: string;
+  fuel_type: FuelEntryDetail['fuelType'];
   liters: number;
   total_price: number;
   station: string;
@@ -68,6 +69,7 @@ function mapFuelDetail(row: FuelDetailRow): EntryDetail {
     vehicleId: row.vehicle_id,
     vehicleName: row.vehicle_name,
     occurredAt: row.occurred_at,
+    fuelType: row.fuel_type,
     liters: row.liters,
     totalPrice: row.total_price,
     station: row.station,
@@ -117,6 +119,7 @@ async function getFuelDetailById(db: SQLite.SQLiteDatabase, id: string) {
         f.vehicle_id,
         v.name AS vehicle_name,
         f.occurred_at,
+        f.fuel_type,
         f.liters,
         f.total_price,
         f.station,
