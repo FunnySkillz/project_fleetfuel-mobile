@@ -1,7 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 
-const DATABASE_NAME = 'fleetfuel.db';
-const SCHEMA_VERSION = 3;
+import { DATABASE_NAME, SCHEMA_VERSION } from '@/data/schema';
+
+export { DATABASE_NAME, SCHEMA_VERSION };
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 let initPromise: Promise<void> | null = null;
@@ -123,6 +124,10 @@ async function migrateToV3(db: SQLite.SQLiteDatabase) {
   `);
 }
 
+async function migrateToV4(db: SQLite.SQLiteDatabase) {
+  await addColumnIfMissing(db, 'fuel_entries', 'fuel_type', 'TEXT');
+}
+
 async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL;');
   await db.execAsync('PRAGMA foreign_keys = ON;');
@@ -138,6 +143,9 @@ async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   }
   if (currentVersion < 3) {
     await migrateToV3(db);
+  }
+  if (currentVersion < 4) {
+    await migrateToV4(db);
   }
 
   if (currentVersion !== SCHEMA_VERSION) {
@@ -175,4 +183,31 @@ export async function runInWriteTransaction<T>(
   }
 
   return result;
+}
+
+export async function resetDatabaseConnection(): Promise<void> {
+  if (databasePromise) {
+    try {
+      const db = await databasePromise;
+      await db.closeAsync();
+    } catch {
+      // Ignore close errors and force re-open on next access.
+    }
+  }
+
+  databasePromise = null;
+  initPromise = null;
+}
+
+export async function checkDatabaseHealth(): Promise<void> {
+  const db = await getDatabase();
+  await db.getFirstAsync<{ ok: number }>('SELECT 1 AS ok;');
+  await db.getFirstAsync<{ table_count: number }>(
+    `
+      SELECT COUNT(1) AS table_count
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND name IN ('vehicles', 'trips', 'fuel_entries')
+    `,
+  );
 }
