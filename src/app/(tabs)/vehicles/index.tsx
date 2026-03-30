@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { AppText, Button, EmptyState, FormField, Input, ListRow, SectionHeader } from '@/components/ui';
+import { AppText, EmptyState, FormField, Input, ListRow, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
 import type { VehicleListItem } from '@/data/types';
@@ -74,8 +74,6 @@ export default function VehiclesScreen() {
       <View style={styles.headerSection}>
         <SectionHeader title={t('vehicles.title')} description={t('vehicles.description')} />
 
-        <Button label={t('vehicles.addAction')} variant="primary" onPress={() => router.push('/vehicles/new')} className="self-start" />
-
         <FormField
           label={t('vehicles.searchLabel')}
           hint={t('vehicles.searchResultsHint', { count: vehicles.length })}>
@@ -91,7 +89,7 @@ export default function VehiclesScreen() {
         </FormField>
       </View>
     ),
-    [query, router, t, vehicles.length],
+    [query, t, vehicles.length],
   );
 
   return (

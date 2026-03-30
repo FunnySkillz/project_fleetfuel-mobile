@@ -300,7 +300,6 @@ export const enMessages = {
 
   'vehicles.title': 'Vehicles',
   'vehicles.description': 'Choose a vehicle to manage trips and fuel logs.',
-  'vehicles.addAction': 'Add Vehicle',
   'vehicles.searchLabel': 'Search Vehicles',
   'vehicles.searchPlaceholder': 'Search by name, plate, make, model, or VIN',
   'vehicles.searchResultsHint': '{count} result(s)',
@@ -733,7 +732,6 @@ export const deMessages: Partial<Record<TranslationKey, string>> = {
 
   'vehicles.title': 'Fahrzeuge',
   'vehicles.description': 'Waehle ein Fahrzeug fuer Fahrten und Tankeintraege.',
-  'vehicles.addAction': 'Fahrzeug hinzufuegen',
   'vehicles.searchLabel': 'Fahrzeuge suchen',
   'vehicles.searchPlaceholder': 'Suche nach Name, Kennzeichen, Marke, Modell oder VIN',
   'vehicles.searchResultsHint': '{count} Treffer',
