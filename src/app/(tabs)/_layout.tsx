@@ -10,6 +10,7 @@ import {
   View,
   type PressableProps,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
@@ -42,6 +43,10 @@ export default function TabsLayout() {
   const theme = useTheme();
   const { t } = useI18n();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const minBottomPadding = Platform.OS === 'ios' ? Spacing.one : Spacing.two;
+  const tabBarBottomPadding = Math.max(insets.bottom, minBottomPadding);
+  const tabBarHeight = BottomTabInset + (tabBarBottomPadding - minBottomPadding);
 
   const openAddMenu = useCallback(() => {
     const goTo = (path: Href) => {
@@ -86,9 +91,9 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: theme.background,
           borderTopColor: theme.backgroundElement,
-          height: BottomTabInset,
+          height: tabBarHeight,
           paddingTop: Spacing.one,
-          paddingBottom: Platform.OS === 'ios' ? Spacing.one : Spacing.two,
+          paddingBottom: tabBarBottomPadding,
         },
       }}>
       <Tabs.Screen
