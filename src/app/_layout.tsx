@@ -116,7 +116,7 @@ function RootNavigator() {
       <AnimatedSplashOverlay />
 
       {healthStatus === 'healthy' ? (
-        <Stack>
+        <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="vehicles/new" options={{ title: t('root.addVehicle') }} />
           <Stack.Screen name="vehicles/[vehicleId]" options={{ title: t('root.vehicleDetail') }} />
