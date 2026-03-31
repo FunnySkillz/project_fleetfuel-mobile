@@ -28,6 +28,11 @@ export default function SettingsScreen() {
               onPress={() => router.push('/settings/appearance')}
             />
             <ActionRow
+              label={t('settings.security.label')}
+              description={t('settings.security.rowDescription')}
+              onPress={() => router.push('/settings/security')}
+            />
+            <ActionRow
               label={t('settings.backup.label')}
               description={t('settings.backup.description')}
               onPress={() => router.push('/settings/backup-restore')}

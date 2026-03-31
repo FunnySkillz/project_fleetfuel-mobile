@@ -14,6 +14,7 @@ type AppPreferencesContextValue = {
   resolvedTheme: ResolvedTheme;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
   setLanguage: (language: AppLanguage) => Promise<void>;
+  setAppLockEnabled: (enabled: boolean) => Promise<void>;
   reloadPreferences: () => Promise<void>;
 };
 
@@ -25,6 +26,7 @@ const AppPreferencesContext = createContext<AppPreferencesContextValue>({
   resolvedTheme: 'light',
   setThemeMode: async () => {},
   setLanguage: async () => {},
+  setAppLockEnabled: async () => {},
   reloadPreferences: async () => {},
 });
 
@@ -115,6 +117,19 @@ export function AppPreferencesProvider({ children }: React.PropsWithChildren) {
     [updatePreferences],
   );
 
+  const setAppLockEnabled = useCallback(
+    async (enabled: boolean) => {
+      await updatePreferences((current) => {
+        if (current.appLockEnabled === enabled) {
+          return current;
+        }
+
+        return { ...current, appLockEnabled: enabled };
+      });
+    },
+    [updatePreferences],
+  );
+
   const value = useMemo<AppPreferencesContextValue>(
     () => ({
       preferences,
@@ -122,9 +137,10 @@ export function AppPreferencesProvider({ children }: React.PropsWithChildren) {
       resolvedTheme: resolveTheme(preferences.themeMode, systemScheme),
       setThemeMode,
       setLanguage,
+      setAppLockEnabled,
       reloadPreferences,
     }),
-    [isHydrated, preferences, reloadPreferences, setLanguage, setThemeMode, systemScheme],
+    [isHydrated, preferences, reloadPreferences, setAppLockEnabled, setLanguage, setThemeMode, systemScheme],
   );
 
   return <AppPreferencesContext.Provider value={value}>{children}</AppPreferencesContext.Provider>;

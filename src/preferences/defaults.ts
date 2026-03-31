@@ -11,5 +11,6 @@ export function createDefaultPreferences(): AppPreferences {
   return {
     themeMode: DEFAULT_THEME_MODE,
     language: detectDefaultLanguage(),
+    appLockEnabled: false,
   };
 }

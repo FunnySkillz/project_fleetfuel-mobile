@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.funnyskillz.fleetfuel",
       "infoPlist": {
+        "NSFaceIDUsageDescription": "FleetFuel uses Face ID to secure your local app data with app lock.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -50,7 +51,8 @@
           "cameraPermission": "FleetFuel needs camera access so you can capture receipt photos."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

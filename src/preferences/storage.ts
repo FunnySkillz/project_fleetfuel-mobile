@@ -13,6 +13,10 @@ function isAppLanguage(value: unknown): value is AppLanguage {
   return value === 'en' || value === 'de';
 }
 
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean';
+}
+
 function normalizeStoredPreferences(value: unknown): AppPreferences {
   const fallback = createDefaultPreferences();
 
@@ -20,11 +24,12 @@ function normalizeStoredPreferences(value: unknown): AppPreferences {
     return fallback;
   }
 
-  const record = value as { themeMode?: unknown; language?: unknown };
+  const record = value as { themeMode?: unknown; language?: unknown; appLockEnabled?: unknown };
 
   return {
     themeMode: isThemeMode(record.themeMode) ? record.themeMode : fallback.themeMode,
     language: isAppLanguage(record.language) ? record.language : fallback.language,
+    appLockEnabled: isBoolean(record.appLockEnabled) ? record.appLockEnabled : fallback.appLockEnabled,
   };
 }
 

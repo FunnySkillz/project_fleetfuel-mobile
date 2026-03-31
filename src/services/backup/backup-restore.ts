@@ -4,7 +4,6 @@ import JSZip from 'jszip';
 import { checkDatabaseHealth, getDatabase, resetDatabaseConnection } from '@/data/db';
 import { DATABASE_NAME } from '@/data/schema';
 import { savePreferences, loadPreferences } from '@/preferences/storage';
-import type { AppPreferences } from '@/preferences/types';
 import { listReceiptFiles, getReceiptsDirectoryPath } from '@/utils/receipt-files';
 
 import {
@@ -14,6 +13,7 @@ import {
   validateBackupManifest,
   validateRestorePreflight,
 } from './manifest';
+import { normalizeBackupPreferences } from './preferences-normalization';
 
 const BACKUPS_DIR_NAME = 'backups';
 const SQLITE_DIR_NAME = 'SQLite';
@@ -83,24 +83,6 @@ function buildBackupFileName(timestampIso: string) {
   const ss = String(safeDate.getUTCSeconds()).padStart(2, '0');
 
   return `fleetfuel_backup_${y}${m}${d}_${hh}${mm}${ss}.zip`;
-}
-
-function normalizePreferences(value: unknown): AppPreferences {
-  const fallback: AppPreferences = { themeMode: 'system', language: 'en' };
-
-  if (!value || typeof value !== 'object') {
-    return fallback;
-  }
-
-  const record = value as { themeMode?: unknown; language?: unknown };
-
-  return {
-    themeMode:
-      record.themeMode === 'system' || record.themeMode === 'light' || record.themeMode === 'dark'
-        ? record.themeMode
-        : fallback.themeMode,
-    language: record.language === 'de' || record.language === 'en' ? record.language : fallback.language,
-  };
 }
 
 async function ensureDirectory(path: string) {
@@ -318,7 +300,7 @@ export async function restoreBackup(backupUri: string): Promise<{ restoredAt: st
   }
 
   const preferencesRaw = await readJsonFromZip<unknown>(archive.zip, archive.manifest.payloads.preferences.path);
-  const normalizedPreferences = normalizePreferences(preferencesRaw);
+  const normalizedPreferences = normalizeBackupPreferences(preferencesRaw);
 
   const tempRoot = getTempRestoreRoot();
   const tempRunDir = `${tempRoot}/${Date.now().toString(36)}`;
