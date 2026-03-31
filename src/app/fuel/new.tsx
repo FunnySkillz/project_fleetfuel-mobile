@@ -7,7 +7,7 @@ import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { Button, Card, EmptyState, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
+import { ActionIcon, Button, Card, EmptyState, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, fuelRepo, vehiclesRepo } from '@/data/repositories';
 import type { FuelType, ReceiptAttachment, VehicleListItem } from '@/data/types';
@@ -656,6 +656,7 @@ export default function AddFuelEntryScreen() {
             loading={saving}
             loadingLabel={t('fuelForm.saving')}
             disabled={!canSubmit}
+            leftIcon={({ color, size }) => <ActionIcon name="save" color={color} size={size} />}
             onPress={() => void handleSave()}
           />
         </ScrollView>

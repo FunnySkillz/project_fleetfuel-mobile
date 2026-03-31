@@ -3,6 +3,7 @@ import type * as SQLite from 'expo-sqlite';
 import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { nowIso } from '@/data/db-utils';
 import type { EntryDetail, FuelEntryDetail, TripPrivateTag } from '@/data/types';
+import { emitDataChange } from '@/services/data-change-events';
 
 import { assertRequiredPrivateTag, normalizeOptionalText } from './shared';
 
@@ -288,6 +289,7 @@ export const entriesRepo = {
       throw new Error('Entry not found after update.');
     }
 
+    emitDataChange({ scope: 'entries', action: 'update' });
     return updated;
   },
 
@@ -325,6 +327,7 @@ export const entriesRepo = {
         throw new Error('Entry not found.');
       }
     });
+    emitDataChange({ scope: 'entries', action: 'delete' });
   },
 
   async countMonthly(referenceIso: string = nowIso()): Promise<{ trips: number; fuelEntries: number }> {

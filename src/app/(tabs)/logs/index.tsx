@@ -394,6 +394,10 @@ export default function LogsScreen() {
                         setYear(null);
                       }
                     }}
+                    onClear={() => {
+                      setFromDate('');
+                    }}
+                    clearable
                     placeholder={t('logs.placeholder.fromDate')}
                     tone={validationErrorKey === 'logs.validation.fromDateFormat' ? 'destructive' : 'neutral'}
                   />
@@ -417,6 +421,10 @@ export default function LogsScreen() {
                         setYear(null);
                       }
                     }}
+                    onClear={() => {
+                      setToDate('');
+                    }}
+                    clearable
                     placeholder={t('logs.placeholder.toDate')}
                     tone={
                       validationErrorKey === 'logs.validation.toDateFormat' || validationErrorKey === 'logs.validation.dateRange'

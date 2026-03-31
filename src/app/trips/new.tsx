@@ -5,7 +5,7 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { Button, Card, DateTimeField, EmptyState, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
+import { ActionIcon, Button, Card, DateTimeField, EmptyState, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, tripsRepo, vehiclesRepo } from '@/data/repositories';
 import type { TripPrivateTag, VehicleListItem } from '@/data/types';
@@ -457,6 +457,11 @@ export default function AddTripScreen() {
                     value={startTime}
                     onChangeText={(value) => setStartTime(sanitizeTimeInput(value))}
                     onBlur={() => setTouched((prev) => ({ ...prev, startTime: true }))}
+                    onClear={() => {
+                      setStartTime('');
+                      setTouched((prev) => ({ ...prev, startTime: true }));
+                    }}
+                    clearable
                     placeholder={t('tripForm.placeholder.startTime')}
                     tone={showError('startTime') ? 'destructive' : 'neutral'}
                   />
@@ -470,6 +475,11 @@ export default function AddTripScreen() {
                     value={endTime}
                     onChangeText={(value) => setEndTime(sanitizeTimeInput(value))}
                     onBlur={() => setTouched((prev) => ({ ...prev, endTime: true }))}
+                    onClear={() => {
+                      setEndTime('');
+                      setTouched((prev) => ({ ...prev, endTime: true }));
+                    }}
+                    clearable
                     placeholder={t('tripForm.placeholder.endTime')}
                     tone={showError('endTime') ? 'destructive' : 'neutral'}
                   />
@@ -543,6 +553,7 @@ export default function AddTripScreen() {
             loadingLabel={t('tripForm.saving')}
             variant="primary"
             disabled={!canSubmit}
+            leftIcon={({ color, size }) => <ActionIcon name="save" color={color} size={size} />}
             onPress={() => void handleSave()}
           />
         </ScrollView>

@@ -41,17 +41,20 @@ type InputProps = TextInputProps &
     disabled?: boolean;
   };
 
-export function Input({
-  className,
-  variant,
-  size,
-  tone = 'neutral',
-  disabled,
-  loading = false,
-  editable,
-  style,
-  ...props
-}: InputProps) {
+export const Input = React.forwardRef<TextInput, InputProps>(function Input(
+  {
+    className,
+    variant,
+    size,
+    tone = 'neutral',
+    disabled,
+    loading = false,
+    editable,
+    style,
+    ...props
+  }: InputProps,
+  ref,
+) {
   const theme = useTheme();
   const isDisabled = disabled || loading || editable === false;
   const borderColor = toneBorderColor(theme, tone);
@@ -60,6 +63,7 @@ export function Input({
 
   return (
     <TextInput
+      ref={ref}
       placeholderTextColor={theme.textSecondary}
       editable={!isDisabled}
       className={cn(
@@ -71,4 +75,4 @@ export function Input({
       {...props}
     />
   );
-}
+});

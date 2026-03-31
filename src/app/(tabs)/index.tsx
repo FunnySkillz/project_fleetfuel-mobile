@@ -1,5 +1,5 @@
 import { useIsFocused } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,6 +8,7 @@ import { AppText, Card, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, vehiclesRepo } from '@/data/repositories';
 import { useI18n } from '@/hooks/use-i18n';
+import { subscribeToDataChanges } from '@/services/data-change-events';
 
 type DashboardMetricProps = {
   label: string;
@@ -33,36 +34,36 @@ export default function DashboardScreen() {
   const [fuelThisMonth, setFuelThisMonth] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const loadMetrics = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const [vehicleCount, monthlyCounts] = await Promise.all([vehiclesRepo.countActive(), entriesRepo.countMonthly()]);
+      setCarsTracked(vehicleCount);
+      setTripsThisMonth(monthlyCounts.trips);
+      setFuelThisMonth(monthlyCounts.fuelEntries);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Failed to load dashboard metrics.');
+    }
+  }, []);
+
   useEffect(() => {
     if (!isFocused) {
       return;
     }
 
-    let cancelled = false;
-    setLoadError(null);
+    void loadMetrics();
+  }, [isFocused, loadMetrics]);
 
-    void Promise.all([vehiclesRepo.countActive(), entriesRepo.countMonthly()])
-      .then(([vehicleCount, monthlyCounts]) => {
-        if (cancelled) {
-          return;
-        }
+  useEffect(() => {
+    const unsubscribe = subscribeToDataChanges((event) => {
+      if (event.scope !== 'vehicles' && event.scope !== 'entries') {
+        return;
+      }
+      loadMetrics();
+    });
 
-        setCarsTracked(vehicleCount);
-        setTripsThisMonth(monthlyCounts.trips);
-        setFuelThisMonth(monthlyCounts.fuelEntries);
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-
-        setLoadError(error instanceof Error ? error.message : 'Failed to load dashboard metrics.');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isFocused]);
+    return unsubscribe;
+  }, [loadMetrics]);
 
   return (
     <ThemedView style={styles.container}>

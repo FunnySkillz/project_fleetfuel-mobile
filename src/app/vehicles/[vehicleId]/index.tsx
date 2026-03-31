@@ -1,11 +1,11 @@
 import { useIsFocused } from '@react-navigation/native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { AppText, Button, Card, EmptyState, ListRow, SectionHeader } from '@/components/ui';
+import { ActionIcon, AppText, Button, Card, EmptyState, ListRow, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
 import type { VehicleInsightSummary, VehicleUsageSplitPoint } from '@/data/types';
@@ -155,8 +155,31 @@ export default function VehicleDetailScreen() {
     );
   };
 
+  const openEditVehicle = useCallback(() => {
+    if (!summary) {
+      return;
+    }
+
+    router.push('./edit');
+  }, [router, summary]);
+
   return (
     <ThemedView style={styles.container}>
+      {summary ? (
+        <Stack.Screen
+          options={{
+            headerRight: () => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('vehicleDetail.editAction')}
+                style={styles.headerIconButton}
+                onPress={openEditVehicle}>
+                <ActionIcon name="edit" color={theme.text} size={20} />
+              </Pressable>
+            ),
+          }}
+        />
+      ) : null}
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView
           contentInsetAdjustmentBehavior="never"
@@ -268,6 +291,12 @@ export default function VehicleDetailScreen() {
 
               <Card className="gap-2">
                 <Button
+                  label={t('vehicleDetail.editAction')}
+                  variant="secondary"
+                  leftIcon={({ color, size }) => <ActionIcon name="edit" color={color} size={size} />}
+                  onPress={openEditVehicle}
+                />
+                <Button
                   label={t('vehicleDetail.addTrip')}
                   variant="secondary"
                   onPress={() =>
@@ -319,6 +348,7 @@ export default function VehicleDetailScreen() {
               <Button
                 label={deleting ? t('vehicleDetail.deleting') : t('vehicleDetail.deleteAction')}
                 variant="destructive"
+                leftIcon={({ color, size }) => <ActionIcon name="delete" color={color} size={size} />}
                 loading={deleting}
                 disabled={deleting}
                 onPress={confirmDeleteVehicle}
@@ -365,6 +395,9 @@ const styles = StyleSheet.create({
   chartBar: {
     height: '100%',
     borderRadius: Spacing.one,
+  },
+  headerIconButton: {
+    padding: 6,
   },
 });
 

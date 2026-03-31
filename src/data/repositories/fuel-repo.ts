@@ -3,6 +3,7 @@ import type * as SQLite from 'expo-sqlite';
 import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { createId, nowIso } from '@/data/db-utils';
 import type { FuelEntryRecord, FuelType, ReceiptAttachment } from '@/data/types';
+import { emitDataChange } from '@/services/data-change-events';
 
 import { normalizeOptionalText, normalizeRequiredText } from './shared';
 
@@ -330,7 +331,7 @@ export const fuelRepo = {
     const normalized = normalizeCreateInput(input);
     const timestamp = nowIso();
 
-    return runInWriteTransaction(async (txn) => {
+    const created = await runInWriteTransaction(async (txn) => {
       await ensureVehicleExists(txn, normalized.vehicleId);
 
       const latestOdometer = await getLatestVehicleOdometer(txn, normalized.vehicleId);
@@ -400,13 +401,15 @@ export const fuelRepo = {
         updatedAt: timestamp,
       };
     });
+    emitDataChange({ scope: 'entries', action: 'create' });
+    return created;
   },
 
   async update(
     id: string,
     patch: Partial<FuelCreateInput>,
   ): Promise<FuelEntryRecord> {
-    return runInWriteTransaction(async (txn) => {
+    const updated = await runInWriteTransaction(async (txn) => {
       const current = await getFuelRowById(txn, id);
       if (!current) {
         throw new Error('Fuel entry not found.');
@@ -498,6 +501,8 @@ export const fuelRepo = {
         updatedAt: timestamp,
       };
     });
+    emitDataChange({ scope: 'entries', action: 'update' });
+    return updated;
   },
 
   async delete(id: string): Promise<void> {
@@ -518,6 +523,7 @@ export const fuelRepo = {
         throw new Error('Fuel entry not found.');
       }
     });
+    emitDataChange({ scope: 'entries', action: 'delete' });
   },
 
   async listActiveReceiptUris(): Promise<string[]> {

@@ -3,6 +3,7 @@ import type * as SQLite from 'expo-sqlite';
 import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { createId, nowIso } from '@/data/db-utils';
 import type { TripPrivateTag, TripRecord } from '@/data/types';
+import { emitDataChange } from '@/services/data-change-events';
 
 import { assertRequiredPrivateTag, ensureValidTime, normalizeOptionalText, normalizeRequiredText } from './shared';
 
@@ -286,7 +287,7 @@ export const tripsRepo = {
     const normalized = normalizeTripCreateInput(input);
     const timestamp = nowIso();
 
-    return runInWriteTransaction(async (txn) => {
+    const created = await runInWriteTransaction(async (txn) => {
       await ensureVehicleExists(txn, normalized.vehicleId);
 
       const latestOdometer = await getLatestVehicleOdometer(txn, normalized.vehicleId);
@@ -345,13 +346,15 @@ export const tripsRepo = {
         updatedAt: timestamp,
       };
     });
+    emitDataChange({ scope: 'entries', action: 'create' });
+    return created;
   },
 
   async update(
     id: string,
     patch: Partial<TripCreateInput>,
   ): Promise<TripRecord> {
-    return runInWriteTransaction(async (txn) => {
+    const updated = await runInWriteTransaction(async (txn) => {
       const current = await getTripRowById(txn, id);
       if (!current) {
         throw new Error('Trip not found.');
@@ -426,6 +429,8 @@ export const tripsRepo = {
         updatedAt: timestamp,
       };
     });
+    emitDataChange({ scope: 'entries', action: 'update' });
+    return updated;
   },
 
   async delete(id: string): Promise<void> {
@@ -446,5 +451,6 @@ export const tripsRepo = {
         throw new Error('Trip not found.');
       }
     });
+    emitDataChange({ scope: 'entries', action: 'delete' });
   },
 };

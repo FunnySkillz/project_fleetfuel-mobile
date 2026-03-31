@@ -1,3 +1,4 @@
+export { ActionIcon } from './action-icon';
 export { ActionRow } from './action-row';
 export { AppText } from './app-text';
 export { Button } from './button';
@@ -15,3 +16,4 @@ export { SectionHeader } from './section-header';
 export { SelectField, type SelectFieldOption } from './select-field';
 export { TextArea } from './text-area';
 export { type SemanticTone } from './tone';
+export { YearPickerField } from './year-picker-field';

@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, View } from 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { AppText, Button, Card, EmptyState, SectionHeader } from '@/components/ui';
+import { ActionIcon, AppText, Button, Card, EmptyState, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo } from '@/data/repositories';
 import type { EntryDetail, FuelType } from '@/data/types';
@@ -247,6 +247,7 @@ export default function EntryDetailScreen() {
               <Button
                 label={t('entryDetail.editAction')}
                 variant="secondary"
+                leftIcon={({ color, size }) => <ActionIcon name="edit" color={color} size={size} />}
                 onPress={() =>
                   router.push({
                     pathname: '/entries/[entryId]/edit',
@@ -258,6 +259,7 @@ export default function EntryDetailScreen() {
               <Button
                 label={deleting ? t('entryDetail.deleting') : t('entryDetail.deleteAction')}
                 variant="destructive"
+                leftIcon={({ color, size }) => <ActionIcon name="delete" color={color} size={size} />}
                 loading={deleting}
                 disabled={deleting}
                 onPress={confirmDelete}

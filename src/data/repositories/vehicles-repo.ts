@@ -11,6 +11,7 @@ import type {
   VehicleRecord,
   VehicleUsageSplitPoint,
 } from '@/data/types';
+import { emitDataChange } from '@/services/data-change-events';
 
 import { normalizeOptionalInteger, normalizeOptionalText, normalizePlate, normalizeRequiredText, normalizeSearch } from './shared';
 
@@ -520,7 +521,7 @@ export const vehiclesRepo = {
     const id = createId('veh');
     const timestamp = nowIso();
 
-    return runInWriteTransaction(async (txn) => {
+    const created = await runInWriteTransaction(async (txn) => {
       await ensureActivePlateIsAvailable(txn, normalized.plate);
       await ensureActiveVinIsAvailable(txn, normalized.vin);
 
@@ -568,10 +569,12 @@ export const vehiclesRepo = {
         updatedAt: timestamp,
       };
     });
+    emitDataChange({ scope: 'vehicles', action: 'create' });
+    return created;
   },
 
   async update(id: string, input: VehicleWriteInput): Promise<VehicleRecord> {
-    return runInWriteTransaction(async (txn) => {
+    const updated = await runInWriteTransaction(async (txn) => {
       const current = await getVehicleRowById(txn, id);
       if (!current) {
         throw new Error('Vehicle not found.');
@@ -623,6 +626,8 @@ export const vehiclesRepo = {
         updatedAt: timestamp,
       };
     });
+    emitDataChange({ scope: 'vehicles', action: 'update' });
+    return updated;
   },
 
   async delete(id: string): Promise<void> {
@@ -665,5 +670,7 @@ export const vehiclesRepo = {
         [timestamp, timestamp, id],
       );
     });
+    emitDataChange({ scope: 'vehicles', action: 'delete' });
+    emitDataChange({ scope: 'entries', action: 'delete' });
   },
 };

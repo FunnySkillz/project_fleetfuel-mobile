@@ -52,6 +52,12 @@ type ButtonProps = PressableProps &
     tone?: SemanticTone;
     className?: string;
     textClassName?: string;
+    leftIcon?:
+      | React.ReactNode
+      | ((props: {
+          color: string;
+          size: number;
+        }) => React.ReactNode);
   };
 
 export function Button({
@@ -64,6 +70,7 @@ export function Button({
   loading = false,
   loadingLabel,
   disabled,
+  leftIcon,
   style,
   ...props
 }: ButtonProps) {
@@ -91,6 +98,8 @@ export function Button({
 
   const labelColor = variant === 'primary' || variant === 'destructive' ? theme.background : toneText;
   const indicatorColor = labelColor;
+  const resolvedLeftIcon =
+    typeof leftIcon === 'function' ? leftIcon({ color: labelColor, size: 16 }) : leftIcon;
   const baseStyle: ViewStyle = { backgroundColor, borderColor };
 
   const mergedStyle = (pressableState: PressableStateCallbackType) => {
@@ -107,9 +116,10 @@ export function Button({
       style={mergedStyle}
       {...props}>
       {loading ? <ActivityIndicator color={indicatorColor} size="small" /> : null}
+      {!loading && resolvedLeftIcon ? resolvedLeftIcon : null}
       <AppText
         variant="label"
-        className={cn(loading && 'ml-2', textClassName)}
+        className={cn((loading || resolvedLeftIcon) && 'ml-2', textClassName)}
         style={{ color: labelColor }}>
         {loading ? loadingLabel ?? label : label}
       </AppText>

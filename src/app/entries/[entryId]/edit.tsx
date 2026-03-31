@@ -5,7 +5,7 @@ import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { Button, Card, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
+import { ActionIcon, Button, Card, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo } from '@/data/repositories';
 import type { EntryDetail, TripPrivateTag } from '@/data/types';
@@ -211,6 +211,7 @@ export default function EditEntryScreen() {
             loading={saving}
             loadingLabel={t('entryEdit.saving')}
             disabled={!canSubmit}
+            leftIcon={({ color, size }) => <ActionIcon name="save" color={color} size={size} />}
             onPress={() => void handleSave()}
           />
         </ScrollView>
