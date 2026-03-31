@@ -1,6 +1,7 @@
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { type Href, Tabs, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
+import { Car, ClipboardList, LayoutDashboard, Settings } from 'lucide-react-native';
 import {
   ActionSheetIOS,
   Alert,
@@ -8,7 +9,6 @@ import {
   Pressable,
   StyleSheet,
   View,
-  type PressableProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,14 +20,14 @@ import { useTheme } from '@/hooks/use-theme';
 function AddTabButton({
   onPress,
   label,
-}: BottomTabBarButtonProps & { onPress: PressableProps['onPress']; label: string }) {
+}: BottomTabBarButtonProps & { onPress: () => void; label: string }) {
   const theme = useTheme();
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
+      onPress={() => onPress()}
       style={({ pressed }) => [styles.addButtonWrap, pressed && styles.pressed]}>
       <View style={[styles.addButtonSurface, { backgroundColor: theme.backgroundElement }]}>
         <ThemedText type="smallBold" style={styles.addGlyph}>
@@ -47,6 +47,7 @@ export default function TabsLayout() {
   const minBottomPadding = Platform.OS === 'ios' ? Spacing.one : Spacing.two;
   const tabBarBottomPadding = Math.max(insets.bottom, minBottomPadding);
   const tabBarHeight = BottomTabInset + (tabBarBottomPadding - minBottomPadding);
+  const addButtonLabel = t('add.buttonLabel');
 
   const openAddMenu = useCallback(() => {
     const goTo = (path: Href) => {
@@ -86,7 +87,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.text,
+        tabBarActiveTintColor: theme.accent,
         tabBarInactiveTintColor: theme.textSecondary,
         tabBarStyle: {
           backgroundColor: theme.background,
@@ -101,6 +102,7 @@ export default function TabsLayout() {
         options={{
           title: t('nav.dashboard'),
           tabBarLabel: t('nav.dashboard'),
+          tabBarIcon: ({ color }) => <LayoutDashboard size={22} color={color} strokeWidth={1.8} />,
         }}
       />
       <Tabs.Screen
@@ -108,6 +110,7 @@ export default function TabsLayout() {
         options={{
           title: t('nav.vehicles'),
           tabBarLabel: t('nav.vehicles'),
+          tabBarIcon: ({ color }) => <Car size={22} color={color} strokeWidth={1.8} />,
         }}
       />
       <Tabs.Screen
@@ -115,7 +118,13 @@ export default function TabsLayout() {
         options={{
           title: t('nav.add'),
           tabBarLabel: t('nav.add'),
-          tabBarButton: (props) => <AddTabButton {...props} onPress={openAddMenu} label={t('add.buttonLabel')} />,
+          tabBarButton: (props) => (
+            <AddTabButton
+              {...props}
+              onPress={openAddMenu}
+              label={addButtonLabel}
+            />
+          ),
         }}
       />
       <Tabs.Screen
@@ -123,6 +132,7 @@ export default function TabsLayout() {
         options={{
           title: t('nav.logs'),
           tabBarLabel: t('nav.logs'),
+          tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} strokeWidth={1.8} />,
         }}
       />
       <Tabs.Screen
@@ -130,6 +140,7 @@ export default function TabsLayout() {
         options={{
           title: t('nav.settings'),
           tabBarLabel: t('nav.settings'),
+          tabBarIcon: ({ color }) => <Settings size={22} color={color} strokeWidth={1.8} />,
         }}
       />
     </Tabs>
