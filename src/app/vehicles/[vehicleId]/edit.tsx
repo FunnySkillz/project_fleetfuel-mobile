@@ -18,8 +18,8 @@ export default function EditVehicleScreen() {
   const { t } = useI18n();
   const theme = useTheme();
   const isFocused = useIsFocused();
-  const params = useLocalSearchParams<{ vehicleId?: string }>();
-  const vehicleId = (params.vehicleId ?? '').trim();
+  const params = useLocalSearchParams<{ vehicleId?: string | string[] }>();
+  const vehicleId = typeof params.vehicleId === 'string' ? params.vehicleId.trim() : '';
 
   const [vehicle, setVehicle] = useState<VehicleRecord | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -62,6 +62,10 @@ export default function EditVehicleScreen() {
   }, [isFocused, loadVehicle]);
 
   const handleSubmit = async (values: VehicleFormSubmitValues) => {
+    if (!vehicleId) {
+      throw new Error(t('vehicleDetail.errorMissingId'));
+    }
+
     if (!vehicle) {
       throw new Error(t('vehicleDetail.errorNotFound'));
     }
@@ -118,4 +122,3 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.four,
   },
 });
-

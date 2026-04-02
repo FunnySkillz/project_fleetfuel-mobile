@@ -69,8 +69,8 @@ export default function VehicleDetailScreen() {
   const theme = useTheme();
   const { t } = useI18n();
   const isFocused = useIsFocused();
-  const params = useLocalSearchParams<{ vehicleId?: string }>();
-  const vehicleId = (params.vehicleId ?? '').trim();
+  const params = useLocalSearchParams<{ vehicleId?: string | string[] }>();
+  const vehicleId = typeof params.vehicleId === 'string' ? params.vehicleId.trim() : '';
 
   const [summary, setSummary] = useState<VehicleInsightSummary | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -160,26 +160,30 @@ export default function VehicleDetailScreen() {
       return;
     }
 
-    router.push('./edit');
+    router.push({
+      pathname: '/vehicles/[vehicleId]/edit',
+      params: { vehicleId: summary.vehicle.id },
+    });
   }, [router, summary]);
 
   return (
     <ThemedView style={styles.container}>
-      {summary ? (
-        <Stack.Screen
-          options={{
-            headerRight: () => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('vehicleDetail.editAction')}
-                style={styles.headerIconButton}
-                onPress={openEditVehicle}>
-                <ActionIcon name="edit" color={theme.text} size={20} />
-              </Pressable>
-            ),
-          }}
-        />
-      ) : null}
+      <Stack.Screen
+        options={{
+          title: t('root.vehicleDetail'),
+          headerRight: summary
+            ? () => (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('vehicleDetail.editAction')}
+                  style={styles.headerIconButton}
+                  onPress={openEditVehicle}>
+                  <ActionIcon name="edit" color={theme.text} size={20} />
+                </Pressable>
+              )
+            : undefined,
+        }}
+      />
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView
           contentInsetAdjustmentBehavior="never"

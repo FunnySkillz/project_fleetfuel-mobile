@@ -96,7 +96,7 @@ export function Button({
         ? theme.destructive
         : toneBorder;
 
-  const labelColor = variant === 'primary' || variant === 'destructive' ? theme.background : toneText;
+  const labelColor = variant === 'primary' || variant === 'destructive' ? theme.text : toneText;
   const indicatorColor = labelColor;
   const resolvedLeftIcon =
     typeof leftIcon === 'function' ? leftIcon({ color: labelColor, size: 16 }) : leftIcon;
