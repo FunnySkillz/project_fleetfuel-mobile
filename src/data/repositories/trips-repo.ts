@@ -5,6 +5,11 @@ import { createId, nowIso } from '@/data/db-utils';
 import type { TripPrivateTag, TripRecord } from '@/data/types';
 import { emitDataChange } from '@/services/data-change-events';
 
+import {
+  resolveEffectiveCurrentOdometerTx,
+  resolveLatestEntryOdometerTx,
+  syncVehicleCurrentOdometerTx,
+} from './odometer-resolver';
 import { assertRequiredPrivateTag, ensureValidTime, normalizeOptionalText, normalizeRequiredText } from './shared';
 
 const PURPOSE_MIN = 3;
@@ -164,39 +169,6 @@ async function getTripRowById(db: SQLite.SQLiteDatabase, id: string) {
   );
 }
 
-async function getLatestVehicleOdometer(
-  db: SQLite.SQLiteDatabase,
-  vehicleId: string,
-  options: { excludeTripId?: string } = {},
-) {
-  const row = await db.getFirstAsync<{ odometer_km: number | null }>(
-    `
-      SELECT odometer_km
-      FROM (
-        SELECT t.end_odometer_km AS odometer_km, t.occurred_at AS occurred_at
-        FROM trips t
-        WHERE t.vehicle_id = ?
-          AND t.deleted_at IS NULL
-          AND (? = '' OR t.id <> ?)
-          AND t.end_odometer_km IS NOT NULL
-
-        UNION ALL
-
-        SELECT f.odometer_km AS odometer_km, f.occurred_at AS occurred_at
-        FROM fuel_entries f
-        WHERE f.vehicle_id = ?
-          AND f.deleted_at IS NULL
-          AND f.odometer_km IS NOT NULL
-      ) latest
-      ORDER BY latest.occurred_at DESC
-      LIMIT 1
-    `,
-    [vehicleId, options.excludeTripId ?? '', options.excludeTripId ?? '', vehicleId],
-  );
-
-  return row?.odometer_km ?? null;
-}
-
 function assertTimeOrder(startTime: string | null, endTime: string | null) {
   if (!startTime || !endTime) {
     return;
@@ -279,7 +251,8 @@ export const tripsRepo = {
 
   async getLatestRecordedOdometerKmForVehicle(vehicleId: string): Promise<number | null> {
     const db = await getDatabase();
-    return getLatestVehicleOdometer(db, vehicleId);
+    const latest = await resolveLatestEntryOdometerTx(db, vehicleId);
+    return latest?.odometerKm ?? null;
   },
 
   async create(input: TripCreateInput): Promise<TripRecord> {
@@ -290,11 +263,11 @@ export const tripsRepo = {
     const created = await runInWriteTransaction(async (txn) => {
       await ensureVehicleExists(txn, normalized.vehicleId);
 
-      const latestOdometer = await getLatestVehicleOdometer(txn, normalized.vehicleId);
-      if (latestOdometer !== null && normalized.startOdometerKm < latestOdometer) {
+      const effectiveCurrent = await resolveEffectiveCurrentOdometerTx(txn, normalized.vehicleId);
+      if (normalized.startOdometerKm < effectiveCurrent.value) {
         throw new Error('Start km cannot be less than the latest recorded km.');
       }
-      if (latestOdometer !== null && normalized.endOdometerKm < latestOdometer) {
+      if (normalized.endOdometerKm < effectiveCurrent.value) {
         throw new Error('Current km cannot be less than the latest recorded km.');
       }
 
@@ -339,6 +312,8 @@ export const tripsRepo = {
         ],
       );
 
+      await syncVehicleCurrentOdometerTx(txn, normalized.vehicleId);
+
       return {
         id,
         ...normalized,
@@ -376,11 +351,11 @@ export const tripsRepo = {
 
       await ensureVehicleExists(txn, normalized.vehicleId);
 
-      const latestOdometer = await getLatestVehicleOdometer(txn, normalized.vehicleId, { excludeTripId: id });
-      if (latestOdometer !== null && normalized.startOdometerKm < latestOdometer) {
+      const effectiveCurrent = await resolveEffectiveCurrentOdometerTx(txn, normalized.vehicleId, { excludeTripId: id });
+      if (normalized.startOdometerKm < effectiveCurrent.value) {
         throw new Error('Start km cannot be less than the latest recorded km.');
       }
-      if (latestOdometer !== null && normalized.endOdometerKm < latestOdometer) {
+      if (normalized.endOdometerKm < effectiveCurrent.value) {
         throw new Error('Current km cannot be less than the latest recorded km.');
       }
 
@@ -422,6 +397,11 @@ export const tripsRepo = {
         ],
       );
 
+      await syncVehicleCurrentOdometerTx(txn, normalized.vehicleId);
+      if (current.vehicle_id !== normalized.vehicleId) {
+        await syncVehicleCurrentOdometerTx(txn, current.vehicle_id);
+      }
+
       return {
         id,
         ...normalized,
@@ -435,6 +415,11 @@ export const tripsRepo = {
 
   async delete(id: string): Promise<void> {
     await runInWriteTransaction(async (txn) => {
+      const current = await getTripRowById(txn, id);
+      if (!current) {
+        throw new Error('Trip not found.');
+      }
+
       const timestamp = nowIso();
       const result = await txn.runAsync(
         `
@@ -450,6 +435,8 @@ export const tripsRepo = {
       if ((result.changes ?? 0) === 0) {
         throw new Error('Trip not found.');
       }
+
+      await syncVehicleCurrentOdometerTx(txn, current.vehicle_id);
     });
     emitDataChange({ scope: 'entries', action: 'delete' });
   },
