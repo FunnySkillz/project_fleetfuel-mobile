@@ -219,6 +219,9 @@ export default function VehicleDetailScreen() {
                 <AppText variant="caption" color="secondary">
                   {t('vehicleDetail.displacementLabel', { value: summary.vehicle.engineDisplacementCc ?? '-' })}
                 </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('vehicleDetail.currentKmLabel', { value: summary.vehicle.currentOdometerKm })}
+                </AppText>
               </Card>
 
               <View style={styles.kpiGrid}>
