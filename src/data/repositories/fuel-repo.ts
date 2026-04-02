@@ -5,6 +5,7 @@ import { createId, nowIso } from '@/data/db-utils';
 import { FUEL_TYPES, type FuelEntryRecord, type FuelType, type ReceiptAttachment } from '@/data/types';
 import { emitDataChange } from '@/services/data-change-events';
 
+import { resolveEffectiveCurrentOdometerTx, syncVehicleCurrentOdometerTx } from './odometer-resolver';
 import { normalizeOptionalText, normalizeRequiredText } from './shared';
 
 const LITERS_MAX = 500;
@@ -200,39 +201,6 @@ async function getFuelRowById(db: SQLite.SQLiteDatabase, id: string) {
   );
 }
 
-async function getLatestVehicleOdometer(
-  db: SQLite.SQLiteDatabase,
-  vehicleId: string,
-  options: { excludeFuelId?: string } = {},
-) {
-  const row = await db.getFirstAsync<{ odometer_km: number | null }>(
-    `
-      SELECT odometer_km
-      FROM (
-        SELECT t.end_odometer_km AS odometer_km, t.occurred_at AS occurred_at
-        FROM trips t
-        WHERE t.vehicle_id = ?
-          AND t.deleted_at IS NULL
-          AND t.end_odometer_km IS NOT NULL
-
-        UNION ALL
-
-        SELECT f.odometer_km AS odometer_km, f.occurred_at AS occurred_at
-        FROM fuel_entries f
-        WHERE f.vehicle_id = ?
-          AND f.deleted_at IS NULL
-          AND (? = '' OR f.id <> ?)
-          AND f.odometer_km IS NOT NULL
-      ) latest
-      ORDER BY latest.occurred_at DESC
-      LIMIT 1
-    `,
-    [vehicleId, vehicleId, options.excludeFuelId ?? '', options.excludeFuelId ?? ''],
-  );
-
-  return row?.odometer_km ?? null;
-}
-
 async function getLatestFuelOdometer(
   db: SQLite.SQLiteDatabase,
   vehicleId: string,
@@ -246,7 +214,7 @@ async function getLatestFuelOdometer(
         AND deleted_at IS NULL
         AND (? = '' OR id <> ?)
         AND odometer_km IS NOT NULL
-      ORDER BY occurred_at DESC, created_at DESC
+      ORDER BY occurred_at DESC, updated_at DESC, created_at DESC, id DESC
       LIMIT 1
     `,
     [vehicleId, options.excludeFuelId ?? '', options.excludeFuelId ?? ''],
@@ -334,8 +302,8 @@ export const fuelRepo = {
     const created = await runInWriteTransaction(async (txn) => {
       await ensureVehicleExists(txn, normalized.vehicleId);
 
-      const latestOdometer = await getLatestVehicleOdometer(txn, normalized.vehicleId);
-      if (latestOdometer !== null && normalized.odometerKm < latestOdometer) {
+      const effectiveCurrent = await resolveEffectiveCurrentOdometerTx(txn, normalized.vehicleId);
+      if (normalized.odometerKm < effectiveCurrent.value) {
         throw new Error('Current km cannot be less than the latest recorded km.');
       }
 
@@ -382,6 +350,8 @@ export const fuelRepo = {
           timestamp,
         ],
       );
+
+      await syncVehicleCurrentOdometerTx(txn, normalized.vehicleId);
 
       return {
         id,
@@ -437,8 +407,8 @@ export const fuelRepo = {
 
       await ensureVehicleExists(txn, normalized.vehicleId);
 
-      const latestOdometer = await getLatestVehicleOdometer(txn, normalized.vehicleId, { excludeFuelId: id });
-      if (latestOdometer !== null && normalized.odometerKm < latestOdometer) {
+      const effectiveCurrent = await resolveEffectiveCurrentOdometerTx(txn, normalized.vehicleId, { excludeFuelId: id });
+      if (normalized.odometerKm < effectiveCurrent.value) {
         throw new Error('Current km cannot be less than the latest recorded km.');
       }
 
@@ -483,6 +453,11 @@ export const fuelRepo = {
         ],
       );
 
+      await syncVehicleCurrentOdometerTx(txn, normalized.vehicleId);
+      if (current.vehicle_id !== normalized.vehicleId) {
+        await syncVehicleCurrentOdometerTx(txn, current.vehicle_id);
+      }
+
       return {
         id,
         vehicleId: normalized.vehicleId,
@@ -507,6 +482,11 @@ export const fuelRepo = {
 
   async delete(id: string): Promise<void> {
     await runInWriteTransaction(async (txn) => {
+      const current = await getFuelRowById(txn, id);
+      if (!current) {
+        throw new Error('Fuel entry not found.');
+      }
+
       const timestamp = nowIso();
       const result = await txn.runAsync(
         `
@@ -522,6 +502,8 @@ export const fuelRepo = {
       if ((result.changes ?? 0) === 0) {
         throw new Error('Fuel entry not found.');
       }
+
+      await syncVehicleCurrentOdometerTx(txn, current.vehicle_id);
     });
     emitDataChange({ scope: 'entries', action: 'delete' });
   },
