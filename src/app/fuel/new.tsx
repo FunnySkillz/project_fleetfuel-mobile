@@ -85,6 +85,7 @@ export default function AddFuelEntryScreen() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
 
   const [latestRecordedKm, setLatestRecordedKm] = useState<number | null>(null);
+  const [odometerSuggestionSource, setOdometerSuggestionSource] = useState<'latestEntry' | 'vehicleBaseline' | null>(null);
   const [previousFuelKm, setPreviousFuelKm] = useState<number | null>(null);
 
   const [liters, setLiters] = useState('');
@@ -160,6 +161,7 @@ export default function AddFuelEntryScreen() {
   useEffect(() => {
     if (!selectedVehicleId) {
       setLatestRecordedKm(null);
+      setOdometerSuggestionSource(null);
       setPreviousFuelKm(null);
       setOdometer('');
       return;
@@ -167,18 +169,19 @@ export default function AddFuelEntryScreen() {
 
     let cancelled = false;
     void Promise.all([
-      entriesRepo.getLatestOdometerKmForVehicle(selectedVehicleId),
+      entriesRepo.resolveEffectiveCurrentOdometer(selectedVehicleId),
       fuelRepo.getLatestFuelOdometerKmForVehicle(selectedVehicleId),
     ])
-      .then(([latestKm, previousFuel]) => {
+      .then(([resolvedCurrent, previousFuel]) => {
         if (cancelled) {
           return;
         }
 
-        setLatestRecordedKm(latestKm);
+        setLatestRecordedKm(resolvedCurrent.value);
+        setOdometerSuggestionSource(resolvedCurrent.source);
         setPreviousFuelKm(previousFuel);
-        if (latestKm !== null) {
-          setOdometer(String(latestKm));
+        if (resolvedCurrent.value !== null) {
+          setOdometer(String(resolvedCurrent.value));
         } else {
           setOdometer('');
         }
@@ -188,6 +191,7 @@ export default function AddFuelEntryScreen() {
           return;
         }
         setLatestRecordedKm(null);
+        setOdometerSuggestionSource(null);
         setPreviousFuelKm(null);
       });
 
@@ -553,7 +557,9 @@ export default function AddFuelEntryScreen() {
               required
               hint={
                 latestRecordedKm !== null
-                  ? t('fuelForm.hint.currentKmLatest', { value: latestRecordedKm })
+                  ? odometerSuggestionSource === 'vehicleBaseline'
+                    ? t('fuelForm.hint.currentKmBaseline', { value: latestRecordedKm })
+                    : t('fuelForm.hint.currentKmLatest', { value: latestRecordedKm })
                   : t('fuelForm.hint.currentKmNoLatest')
               }
               error={showError('odometer') ? errors.odometer : null}>
