@@ -1,6 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -45,6 +45,12 @@ function isValidTime(value: string) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
 }
 
+function currentLocalTimeHHMM(date: Date = new Date()) {
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
 export default function AddTripScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -65,16 +71,19 @@ export default function AddTripScreen() {
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
 
-  const [latestRecordedKm, setLatestRecordedKm] = useState<number | null>(null);
+  const [effectiveCurrentKm, setEffectiveCurrentKm] = useState<number | null>(null);
+  const [startSuggestionSource, setStartSuggestionSource] = useState<'latestEntry' | 'vehicleBaseline' | null>(null);
   const [startOdometer, setStartOdometer] = useState('');
   const [endOdometer, setEndOdometer] = useState('');
   const [purpose, setPurpose] = useState('');
   const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const initialEndTimeRef = useRef(currentLocalTimeHHMM());
+  const [endTime, setEndTime] = useState(initialEndTimeRef.current);
   const [startLocation, setStartLocation] = useState('');
   const [endLocation, setEndLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [privateTag, setPrivateTag] = useState<TripPrivateTag>(null);
+  const startOdometerEditedRef = useRef(false);
 
   const [saving, setSaving] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -142,24 +151,30 @@ export default function AddTripScreen() {
 
   useEffect(() => {
     if (!selectedVehicleId) {
-      setLatestRecordedKm(null);
+      setEffectiveCurrentKm(null);
+      setStartSuggestionSource(null);
+      startOdometerEditedRef.current = false;
       setStartOdometer('');
       return;
     }
 
+    startOdometerEditedRef.current = false;
+    setStartOdometer('');
+    setEffectiveCurrentKm(null);
+    setStartSuggestionSource(null);
+
     let cancelled = false;
     void entriesRepo
-      .getLatestOdometerKmForVehicle(selectedVehicleId)
-      .then((value) => {
+      .resolveEffectiveCurrentOdometer(selectedVehicleId)
+      .then((resolved) => {
         if (cancelled) {
           return;
         }
 
-        setLatestRecordedKm(value);
-        if (value !== null) {
-          setStartOdometer(String(value));
-        } else {
-          setStartOdometer('');
+        setEffectiveCurrentKm(resolved.value);
+        setStartSuggestionSource(resolved.source);
+        if (!startOdometerEditedRef.current) {
+          setStartOdometer(String(resolved.value));
         }
       })
       .catch(() => {
@@ -167,7 +182,8 @@ export default function AddTripScreen() {
           return;
         }
 
-        setLatestRecordedKm(null);
+        setEffectiveCurrentKm(null);
+        setStartSuggestionSource(null);
       });
 
     return () => {
@@ -205,7 +221,7 @@ export default function AddTripScreen() {
       endOdometer.trim().length > 0 ||
       purpose.trim().length > 0 ||
       startTime.trim().length > 0 ||
-      endTime.trim().length > 0 ||
+      endTime.trim() !== initialEndTimeRef.current ||
       startLocation.trim().length > 0 ||
       endLocation.trim().length > 0 ||
       notes.trim().length > 0 ||
@@ -230,8 +246,8 @@ export default function AddTripScreen() {
       result.startOdometer = t('tripForm.error.startKmRequired');
     } else if (startKmValue === null) {
       result.startOdometer = t('tripForm.error.startKmInteger');
-    } else if (latestRecordedKm !== null && startKmValue < latestRecordedKm) {
-      result.startOdometer = t('tripForm.error.startKmBelowLatest', { value: latestRecordedKm });
+    } else if (effectiveCurrentKm !== null && startKmValue < effectiveCurrentKm) {
+      result.startOdometer = t('tripForm.error.startKmBelowLatest', { value: effectiveCurrentKm });
     }
 
     if (endOdometer.trim().length === 0) {
@@ -242,8 +258,8 @@ export default function AddTripScreen() {
       result.endOdometer = t('tripForm.error.currentKmBelowStart');
     } else if (startKmValue !== null && endKmValue === startKmValue) {
       result.endOdometer = t('tripForm.error.currentKmEqualStart');
-    } else if (latestRecordedKm !== null && endKmValue < latestRecordedKm) {
-      result.endOdometer = t('tripForm.error.currentKmBelowLatest', { value: latestRecordedKm });
+    } else if (effectiveCurrentKm !== null && endKmValue < effectiveCurrentKm) {
+      result.endOdometer = t('tripForm.error.currentKmBelowLatest', { value: effectiveCurrentKm });
     }
 
     if (purposeLength === 0) {
@@ -290,7 +306,7 @@ export default function AddTripScreen() {
     endLocation,
     endOdometer,
     endTime,
-    latestRecordedKm,
+    effectiveCurrentKm,
     notes,
     privateTag,
     purpose,
@@ -417,18 +433,22 @@ export default function AddTripScreen() {
               label={t('tripForm.field.startKm')}
               required
               hint={
-                latestRecordedKm !== null
-                  ? t('tripForm.hint.startKmLatest', { value: latestRecordedKm })
+                effectiveCurrentKm !== null
+                  ? startSuggestionSource === 'vehicleBaseline'
+                    ? t('tripForm.hint.startKmBaseline', { value: effectiveCurrentKm })
+                    : t('tripForm.hint.startKmLatest', { value: effectiveCurrentKm })
                   : t('tripForm.hint.startKmNoLatest')
               }
               error={showError('startOdometer') ? errors.startOdometer : null}>
               <Input
                 value={startOdometer}
-                onChangeText={(value) => setStartOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
+                onChangeText={(value) => {
+                  startOdometerEditedRef.current = true;
+                  setStartOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS));
+                }}
                 onBlur={() => setTouched((prev) => ({ ...prev, startOdometer: true }))}
                 keyboardType="number-pad"
-                disabled={latestRecordedKm !== null}
-                placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : t('tripForm.placeholder.currentKm')}
+                placeholder={effectiveCurrentKm !== null ? String(effectiveCurrentKm) : t('tripForm.placeholder.currentKm')}
                 tone={showError('startOdometer') ? 'destructive' : 'neutral'}
               />
             </FormField>
