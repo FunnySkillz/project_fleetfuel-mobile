@@ -5,6 +5,13 @@ import { nowIso } from '@/data/db-utils';
 import type { EntryDetail, FuelEntryDetail, TripPrivateTag } from '@/data/types';
 import { emitDataChange } from '@/services/data-change-events';
 
+import {
+  resolveEffectiveCurrentOdometer as resolveEffectiveCurrentOdometerQuery,
+  resolveLatestEntryOdometer as resolveLatestEntryOdometerQuery,
+  syncVehicleCurrentOdometerTx,
+  type EffectiveCurrentOdometer,
+  type LatestEntryOdometer,
+} from './odometer-resolver';
 import { assertRequiredPrivateTag, normalizeOptionalText } from './shared';
 
 const NOTES_MAX = 500;
@@ -165,34 +172,6 @@ function getMonthRangeIso(referenceIso: string) {
   };
 }
 
-async function getLatestVehicleOdometer(db: SQLite.SQLiteDatabase, vehicleId: string) {
-  const row = await db.getFirstAsync<{ odometer_km: number | null }>(
-    `
-      SELECT odometer_km
-      FROM (
-        SELECT t.end_odometer_km AS odometer_km, t.occurred_at AS occurred_at
-        FROM trips t
-        WHERE t.vehicle_id = ?
-          AND t.deleted_at IS NULL
-          AND t.end_odometer_km IS NOT NULL
-
-        UNION ALL
-
-        SELECT f.odometer_km AS odometer_km, f.occurred_at AS occurred_at
-        FROM fuel_entries f
-        WHERE f.vehicle_id = ?
-          AND f.deleted_at IS NULL
-          AND f.odometer_km IS NOT NULL
-      ) latest
-      ORDER BY latest.occurred_at DESC
-      LIMIT 1
-    `,
-    [vehicleId, vehicleId],
-  );
-
-  return row?.odometer_km ?? null;
-}
-
 export const entriesRepo = {
   async getById(id: string): Promise<EntryDetail | null> {
     const db = await getDatabase();
@@ -211,8 +190,16 @@ export const entriesRepo = {
   },
 
   async getLatestOdometerKmForVehicle(vehicleId: string): Promise<number | null> {
-    const db = await getDatabase();
-    return getLatestVehicleOdometer(db, vehicleId);
+    const latest = await resolveLatestEntryOdometerQuery(vehicleId);
+    return latest?.odometerKm ?? null;
+  },
+
+  async resolveLatestEntryOdometer(vehicleId: string): Promise<LatestEntryOdometer | null> {
+    return resolveLatestEntryOdometerQuery(vehicleId);
+  },
+
+  async resolveEffectiveCurrentOdometer(vehicleId: string): Promise<EffectiveCurrentOdometer> {
+    return resolveEffectiveCurrentOdometerQuery(vehicleId);
   },
 
   async updateEditableFields(
@@ -296,20 +283,50 @@ export const entriesRepo = {
   async delete(id: string): Promise<void> {
     await runInWriteTransaction(async (txn) => {
       const timestamp = nowIso();
-
-      const tripDelete = await txn.runAsync(
+      const trip = await txn.getFirstAsync<{ id: string; vehicle_id: string }>(
         `
-          UPDATE trips
-          SET deleted_at = ?,
-              updated_at = ?
+          SELECT id, vehicle_id
+          FROM trips
           WHERE id = ?
             AND deleted_at IS NULL
+          LIMIT 1
         `,
-        [timestamp, timestamp, id],
+        [id],
       );
 
-      if ((tripDelete.changes ?? 0) > 0) {
+      if (trip) {
+        const tripDelete = await txn.runAsync(
+          `
+            UPDATE trips
+            SET deleted_at = ?,
+                updated_at = ?
+            WHERE id = ?
+              AND deleted_at IS NULL
+          `,
+          [timestamp, timestamp, id],
+        );
+
+        if ((tripDelete.changes ?? 0) === 0) {
+          throw new Error('Entry not found.');
+        }
+
+        await syncVehicleCurrentOdometerTx(txn, trip.vehicle_id);
         return;
+      }
+
+      const fuel = await txn.getFirstAsync<{ id: string; vehicle_id: string }>(
+        `
+          SELECT id, vehicle_id
+          FROM fuel_entries
+          WHERE id = ?
+            AND deleted_at IS NULL
+          LIMIT 1
+        `,
+        [id],
+      );
+
+      if (!fuel) {
+        throw new Error('Entry not found.');
       }
 
       const fuelDelete = await txn.runAsync(
@@ -326,6 +343,8 @@ export const entriesRepo = {
       if ((fuelDelete.changes ?? 0) === 0) {
         throw new Error('Entry not found.');
       }
+
+      await syncVehicleCurrentOdometerTx(txn, fuel.vehicle_id);
     });
     emitDataChange({ scope: 'entries', action: 'delete' });
   },
