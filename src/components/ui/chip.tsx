@@ -68,7 +68,12 @@ export function Chip({
   const theme = useTheme();
   const isDisabled = disabled || loading;
   const toneColor = toneTextColor(theme, tone);
-  const borderColor = variant === 'outline' || tone !== 'neutral' ? toneBorderColor(theme, tone) : 'transparent';
+  const borderColor =
+    variant === 'outline' || tone !== 'neutral'
+      ? toneBorderColor(theme, tone)
+      : active
+        ? theme.accent
+        : theme.backgroundSelected;
   const backgroundColor =
     variant === 'outline'
       ? 'transparent'
@@ -92,7 +97,7 @@ export function Chip({
       <AppText
         variant="label"
         className={cn(loading && 'mt-1')}
-        style={{ color: tone === 'neutral' ? theme.text : toneColor }}>
+        style={{ color: tone === 'neutral' ? (active ? theme.accent : theme.text) : toneColor }}>
         {label}
       </AppText>
     </Pressable>

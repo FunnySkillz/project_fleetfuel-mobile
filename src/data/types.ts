@@ -2,7 +2,8 @@ export type EntryType = 'trip' | 'fuel';
 export type TripClassification = 'private' | 'business';
 export type TripPrivateTag = TripClassification | null;
 export type TripUsageFilter = 'both' | 'work' | 'private' | 'unclassified';
-export type FuelType = 'petrol' | 'diesel' | 'electric' | 'hybrid' | 'lpg' | 'cng' | 'other';
+export const FUEL_TYPES = ['petrol', 'diesel', 'electric', 'hybrid', 'lpg', 'cng', 'other'] as const;
+export type FuelType = (typeof FUEL_TYPES)[number];
 export type FuelTypeFilter = FuelType | 'all';
 
 export type ReceiptAttachment = {
@@ -15,6 +16,8 @@ export type VehicleRecord = {
   id: string;
   name: string;
   plate: string;
+  currentOdometerKm: number;
+  defaultFuelType: FuelType;
   make: string | null;
   model: string | null;
   year: number | null;

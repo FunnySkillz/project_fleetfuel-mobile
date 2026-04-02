@@ -1,4 +1,6 @@
-import type { TripClassification } from '@/data/types';
+import { FUEL_TYPES, type FuelType, type TripClassification } from '@/data/types';
+
+const FUEL_TYPE_SET = new Set<FuelType>(FUEL_TYPES);
 
 export function normalizeRequiredText(value: string, fieldName: string) {
   const normalized = value.trim().replace(/\s+/g, ' ');
@@ -99,4 +101,32 @@ export function normalizeOptionalInteger(value: number | null | undefined, field
   }
 
   return value;
+}
+
+export function normalizeRequiredInteger(value: number | null | undefined, fieldName: string, min: number, max: number) {
+  if (value === null || value === undefined) {
+    throw new Error(`${fieldName} is required.`);
+  }
+
+  if (!Number.isInteger(value)) {
+    throw new Error(`${fieldName} must be a whole number.`);
+  }
+
+  if (value < min || value > max) {
+    throw new Error(`${fieldName} must be between ${min} and ${max}.`);
+  }
+
+  return value;
+}
+
+export function assertValidFuelType(value: string | null | undefined, fieldName = 'Fuel type'): FuelType {
+  if (!value) {
+    throw new Error(`${fieldName} is required.`);
+  }
+
+  if (!FUEL_TYPE_SET.has(value as FuelType)) {
+    throw new Error(`${fieldName} is invalid.`);
+  }
+
+  return value as FuelType;
 }

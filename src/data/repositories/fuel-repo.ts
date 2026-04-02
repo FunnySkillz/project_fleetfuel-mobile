@@ -2,7 +2,7 @@ import type * as SQLite from 'expo-sqlite';
 
 import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { createId, nowIso } from '@/data/db-utils';
-import type { FuelEntryRecord, FuelType, ReceiptAttachment } from '@/data/types';
+import { FUEL_TYPES, type FuelEntryRecord, type FuelType, type ReceiptAttachment } from '@/data/types';
 import { emitDataChange } from '@/services/data-change-events';
 
 import { normalizeOptionalText, normalizeRequiredText } from './shared';
@@ -13,7 +13,7 @@ const STATION_MIN = 2;
 const STATION_MAX = 80;
 const NOTES_MAX = 500;
 const ODOMETER_MAX = 9_999_999;
-const FUEL_TYPES = new Set<FuelType>(['petrol', 'diesel', 'electric', 'hybrid', 'lpg', 'cng', 'other']);
+const FUEL_TYPE_SET = new Set<FuelType>(FUEL_TYPES);
 
 type FuelRow = {
   id: string;
@@ -148,7 +148,7 @@ function normalizeFuelType(value: FuelType | null | undefined) {
     return null;
   }
 
-  if (FUEL_TYPES.has(value)) {
+  if (FUEL_TYPE_SET.has(value)) {
     return value;
   }
 

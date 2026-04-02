@@ -3,6 +3,7 @@ import type * as SQLite from 'expo-sqlite';
 import { getDatabase, runInWriteTransaction } from '@/data/db';
 import { createId, nowIso } from '@/data/db-utils';
 import type {
+  FuelType,
   TripPrivateTag,
   VehicleInsightSummary,
   VehicleListItem,
@@ -13,12 +14,21 @@ import type {
 } from '@/data/types';
 import { emitDataChange } from '@/services/data-change-events';
 
-import { normalizeOptionalInteger, normalizeOptionalText, normalizePlate, normalizeRequiredText, normalizeSearch } from './shared';
+import {
+  assertValidFuelType,
+  normalizeOptionalInteger,
+  normalizeOptionalText,
+  normalizePlate,
+  normalizeRequiredInteger,
+  normalizeRequiredText,
+  normalizeSearch,
+} from './shared';
 
 const VEHICLE_NAME_MIN = 2;
 const VEHICLE_NAME_MAX = 60;
 const TEXT_FIELD_MAX = 80;
 const ENGINE_CODE_MAX = 40;
+const ODOMETER_MAX = 9_999_999;
 const INSIGHT_MONTHS_DEFAULT = 6;
 const RECENT_TRIPS_LIMIT_DEFAULT = 6;
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -27,6 +37,8 @@ type VehicleRow = {
   id: string;
   name: string;
   plate: string;
+  current_odometer_km: number;
+  default_fuel_type: FuelType;
   make: string | null;
   model: string | null;
   year: number | null;
@@ -75,6 +87,8 @@ type VehicleRecentTripRow = {
 type VehicleWriteInput = {
   name: string;
   plate: string;
+  currentOdometerKm: number;
+  defaultFuelType: FuelType;
   make?: string | null;
   model?: string | null;
   year?: number | null;
@@ -88,6 +102,8 @@ type VehicleWriteInput = {
 type NormalizedVehicleInput = {
   name: string;
   plate: string;
+  currentOdometerKm: number;
+  defaultFuelType: FuelType;
   make: string | null;
   model: string | null;
   year: number | null;
@@ -103,6 +119,8 @@ function mapVehicleRecord(row: VehicleRow): VehicleRecord {
     id: row.id,
     name: row.name,
     plate: row.plate,
+    currentOdometerKm: row.current_odometer_km,
+    defaultFuelType: row.default_fuel_type,
     make: row.make,
     model: row.model,
     year: row.year,
@@ -236,6 +254,8 @@ function normalizeVehicleInput(input: VehicleWriteInput): NormalizedVehicleInput
   return {
     name,
     plate: normalizePlate(input.plate),
+    currentOdometerKm: normalizeRequiredInteger(input.currentOdometerKm, 'Current odometer km', 0, ODOMETER_MAX),
+    defaultFuelType: assertValidFuelType(input.defaultFuelType, 'Default fuel type'),
     make: normalizeBoundedOptionalText(input.make, 'Make', TEXT_FIELD_MAX),
     model: normalizeBoundedOptionalText(input.model, 'Model', TEXT_FIELD_MAX),
     year: normalizeOptionalInteger(input.year, 'Year', 1950, new Date().getUTCFullYear() + 1),
@@ -294,6 +314,8 @@ async function getVehicleRowById(db: SQLite.SQLiteDatabase, id: string) {
         id,
         name,
         plate,
+        current_odometer_km,
+        default_fuel_type,
         make,
         model,
         year,
@@ -325,6 +347,8 @@ export const vehiclesRepo = {
           v.id,
           v.name,
           v.plate,
+          v.current_odometer_km,
+          v.default_fuel_type,
           v.make,
           v.model,
           v.year,
@@ -531,6 +555,8 @@ export const vehiclesRepo = {
             id,
             name,
             plate,
+            current_odometer_km,
+            default_fuel_type,
             make,
             model,
             year,
@@ -543,12 +569,14 @@ export const vehiclesRepo = {
             updated_at,
             deleted_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         `,
         [
           id,
           normalized.name,
           normalized.plate,
+          normalized.currentOdometerKm,
+          normalized.defaultFuelType,
           normalized.make,
           normalized.model,
           normalized.year,
@@ -591,6 +619,8 @@ export const vehiclesRepo = {
           UPDATE vehicles
           SET name = ?,
               plate = ?,
+              current_odometer_km = ?,
+              default_fuel_type = ?,
               make = ?,
               model = ?,
               year = ?,
@@ -606,6 +636,8 @@ export const vehiclesRepo = {
         [
           normalized.name,
           normalized.plate,
+          normalized.currentOdometerKm,
+          normalized.defaultFuelType,
           normalized.make,
           normalized.model,
           normalized.year,

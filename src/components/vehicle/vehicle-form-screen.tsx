@@ -13,10 +13,12 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { ActionIcon, Button, Card, FormField, Input, SectionHeader, YearPickerField } from '@/components/ui';
+import { ActionIcon, Button, Card, FormField, Input, SectionHeader, SelectField, YearPickerField } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { FUEL_TYPES, type FuelType } from '@/data/types';
 import { useI18n } from '@/hooks/use-i18n';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import { buildFuelTypeOptions } from '@/utils/fuel-type-options';
 import { parseIntegerValue, sanitizeIntegerInput, sanitizePlateInput, trimmedLength } from '@/utils/form-input';
 import { kwFromPs, psFromKw } from '@/utils/vehicle-power';
 
@@ -27,10 +29,13 @@ const LICENSE_PLATE_MAX = 16;
 const TEXT_MAX = 80;
 const ENGINE_CODE_MAX = 40;
 const YEAR_MIN = 1950;
+const ODOMETER_MAX = 9_999_999;
 
 type VehicleFieldKey =
   | 'name'
   | 'plate'
+  | 'currentOdometerKm'
+  | 'defaultFuelType'
   | 'make'
   | 'model'
   | 'year'
@@ -47,6 +52,8 @@ type VehicleFormTouchedState = Record<VehicleFieldKey, boolean>;
 type VehicleFormErrors = {
   name?: string;
   plate?: string;
+  currentOdometerKm?: string;
+  defaultFuelType?: string;
   make?: string;
   model?: string;
   year?: string;
@@ -60,6 +67,8 @@ type VehicleFormErrors = {
 export type VehicleFormInitialValues = {
   name?: string | null;
   plate?: string | null;
+  currentOdometerKm?: number | null;
+  defaultFuelType?: FuelType | null;
   make?: string | null;
   model?: string | null;
   year?: number | null;
@@ -73,6 +82,8 @@ export type VehicleFormInitialValues = {
 export type VehicleFormSubmitValues = {
   name: string;
   plate: string;
+  currentOdometerKm: number;
+  defaultFuelType: FuelType;
   make: string | null;
   model: string | null;
   year: number | null;
@@ -105,6 +116,11 @@ function toFormState(initialValues: VehicleFormInitialValues | undefined): Vehic
   return {
     name: initialValues?.name ?? '',
     plate: initialValues?.plate ?? '',
+    currentOdometerKm:
+      initialValues?.currentOdometerKm === null || initialValues?.currentOdometerKm === undefined
+        ? ''
+        : String(initialValues.currentOdometerKm),
+    defaultFuelType: initialValues?.defaultFuelType ?? '',
     make: initialValues?.make ?? '',
     model: initialValues?.model ?? '',
     year: initialValues?.year === null || initialValues?.year === undefined ? '' : String(initialValues.year),
@@ -123,6 +139,8 @@ function toTouchedState(value: boolean): VehicleFormTouchedState {
   return {
     name: value,
     plate: value,
+    currentOdometerKm: value,
+    defaultFuelType: value,
     make: value,
     model: value,
     year: value,
@@ -134,10 +152,19 @@ function toTouchedState(value: boolean): VehicleFormTouchedState {
   };
 }
 
-function createSubmitPayload(form: VehicleFormState): VehicleFormSubmitValues {
+type VehicleFormComparableValues = Omit<VehicleFormSubmitValues, 'currentOdometerKm' | 'defaultFuelType'> & {
+  currentOdometerKm: number | null;
+  defaultFuelType: FuelType | null;
+};
+
+function createComparablePayload(form: VehicleFormState): VehicleFormComparableValues {
+  const selectedFuelType = FUEL_TYPES.find((value) => value === form.defaultFuelType) ?? null;
+
   return {
     name: normalizeInputText(form.name),
     plate: normalizeInputText(form.plate),
+    currentOdometerKm: parseIntegerValue(form.currentOdometerKm),
+    defaultFuelType: selectedFuelType,
     make: normalizeInputText(form.make) || null,
     model: normalizeInputText(form.model) || null,
     year: parseIntegerValue(form.year),
@@ -153,6 +180,8 @@ function firstErrorField(errors: VehicleFormErrors): VehicleFieldKey | null {
   const orderedFields: VehicleFieldKey[] = [
     'name',
     'plate',
+    'currentOdometerKm',
+    'defaultFuelType',
     'year',
     'ps',
     'kw',
@@ -188,12 +217,14 @@ export function VehicleFormScreen({
   const vinInputRef = useRef<TextInput>(null);
   const engineCodeInputRef = useRef<TextInput>(null);
 
-  const initialPayload = useMemo(() => createSubmitPayload(initialFormState), [initialFormState]);
-  const currentPayload = useMemo(() => createSubmitPayload(form), [form]);
+  const initialPayload = useMemo(() => createComparablePayload(initialFormState), [initialFormState]);
+  const currentPayload = useMemo(() => createComparablePayload(form), [form]);
   const isDirty = useMemo(() => {
     return (
       currentPayload.name !== initialPayload.name ||
       currentPayload.plate !== initialPayload.plate ||
+      currentPayload.currentOdometerKm !== initialPayload.currentOdometerKm ||
+      currentPayload.defaultFuelType !== initialPayload.defaultFuelType ||
       currentPayload.make !== initialPayload.make ||
       currentPayload.model !== initialPayload.model ||
       currentPayload.year !== initialPayload.year ||
@@ -206,11 +237,14 @@ export function VehicleFormScreen({
   }, [currentPayload, initialPayload]);
 
   const { allowNextNavigation } = useUnsavedChangesGuard(isDirty || saving);
+  const fuelTypeOptions = useMemo(() => buildFuelTypeOptions(t), [t]);
 
   const errors = useMemo<VehicleFormErrors>(() => {
     const result: VehicleFormErrors = {};
     const normalizedName = normalizeInputText(form.name);
     const normalizedPlate = normalizeInputText(form.plate);
+    const odometerValue = parseIntegerValue(form.currentOdometerKm);
+    const selectedFuelType = FUEL_TYPES.find((value) => value === form.defaultFuelType) ?? null;
 
     if (normalizedName.length === 0) {
       result.name = t('vehicleForm.error.nameRequired');
@@ -228,6 +262,20 @@ export function VehicleFormScreen({
       result.plate = t('vehicleForm.error.plateMax', { max: LICENSE_PLATE_MAX });
     } else if (!/^[A-Z0-9 -]+$/.test(normalizedPlate)) {
       result.plate = t('vehicleForm.error.platePattern');
+    }
+
+    if (form.currentOdometerKm.trim().length === 0) {
+      result.currentOdometerKm = t('vehicleForm.error.currentKmRequired');
+    } else if (odometerValue === null) {
+      result.currentOdometerKm = t('vehicleForm.error.currentKmInteger');
+    } else if (odometerValue < 0) {
+      result.currentOdometerKm = t('vehicleForm.error.currentKmNonNegative');
+    } else if (odometerValue > ODOMETER_MAX) {
+      result.currentOdometerKm = t('vehicleForm.error.currentKmMax', { max: ODOMETER_MAX });
+    }
+
+    if (!selectedFuelType) {
+      result.defaultFuelType = t('vehicleForm.error.defaultFuelTypeRequired');
     }
 
     const yearValue = parseIntegerValue(form.year);
@@ -270,6 +318,8 @@ export function VehicleFormScreen({
   const isValid =
     !errors.name &&
     !errors.plate &&
+    !errors.currentOdometerKm &&
+    !errors.defaultFuelType &&
     !errors.year &&
     !errors.ps &&
     !errors.kw &&
@@ -339,7 +389,11 @@ export function VehicleFormScreen({
 
     setSaving(true);
     try {
-      await onSubmit(currentPayload);
+      await onSubmit({
+        ...currentPayload,
+        currentOdometerKm: currentPayload.currentOdometerKm as number,
+        defaultFuelType: currentPayload.defaultFuelType as FuelType,
+      });
       allowNextNavigation();
       onSubmitSuccess?.();
     } catch (error) {
@@ -399,6 +453,38 @@ export function VehicleFormScreen({
                   autoCorrect={false}
                   maxLength={LICENSE_PLATE_MAX}
                   tone={showError('plate') ? 'destructive' : 'neutral'}
+                />
+              </FormField>
+
+              <FormField
+                onLayout={handleLayout('currentOdometerKm')}
+                label={t('vehicleForm.field.currentKm')}
+                required
+                error={showError('currentOdometerKm') ? errors.currentOdometerKm : null}>
+                <Input
+                  value={form.currentOdometerKm}
+                  onChangeText={(value) =>
+                    setForm((previous) => ({ ...previous, currentOdometerKm: sanitizeIntegerInput(value, 7) }))
+                  }
+                  onBlur={() => markTouched('currentOdometerKm')}
+                  keyboardType="number-pad"
+                  placeholder={t('vehicleForm.placeholder.currentKm')}
+                  tone={showError('currentOdometerKm') ? 'destructive' : 'neutral'}
+                />
+              </FormField>
+
+              <FormField
+                onLayout={handleLayout('defaultFuelType')}
+                label={t('vehicleForm.field.defaultFuelType')}
+                required
+                error={showError('defaultFuelType') ? errors.defaultFuelType : null}>
+                <SelectField
+                  options={fuelTypeOptions}
+                  value={form.defaultFuelType || null}
+                  onChange={(value) => {
+                    setForm((previous) => ({ ...previous, defaultFuelType: value }));
+                    markTouched('defaultFuelType');
+                  }}
                 />
               </FormField>
 

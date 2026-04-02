@@ -7,12 +7,14 @@ import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
+import { VehiclePickerField } from '@/components/vehicle/vehicle-picker-field';
 import { ActionIcon, Button, Card, EmptyState, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, fuelRepo, vehiclesRepo } from '@/data/repositories';
 import type { FuelType, ReceiptAttachment, VehicleListItem } from '@/data/types';
 import { useI18n } from '@/hooks/use-i18n';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import { buildFuelTypeOptions } from '@/utils/fuel-type-options';
 import {
   parseDecimalValue,
   parseIntegerValue,
@@ -67,11 +69,20 @@ export default function AddFuelEntryScreen() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { t } = useI18n();
-  const params = useLocalSearchParams<{ vehicleId?: string }>();
+  const params = useLocalSearchParams<{ vehicleId?: string | string[] }>();
+  const routeVehicleId = useMemo(() => {
+    if (typeof params.vehicleId === 'string') {
+      return params.vehicleId.trim();
+    }
+    if (Array.isArray(params.vehicleId)) {
+      return params.vehicleId.map((entry) => entry.trim()).find((entry) => entry.length > 0) ?? '';
+    }
+    return '';
+  }, [params.vehicleId]);
 
   const [vehicles, setVehicles] = useState<VehicleListItem[]>([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
-  const [selectedVehicleId, setSelectedVehicleId] = useState((params.vehicleId ?? '').trim());
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
 
   const [latestRecordedKm, setLatestRecordedKm] = useState<number | null>(null);
   const [previousFuelKm, setPreviousFuelKm] = useState<number | null>(null);
@@ -81,6 +92,7 @@ export default function AddFuelEntryScreen() {
   const [station, setStation] = useState('');
   const [odometer, setOdometer] = useState('');
   const [fuelType, setFuelType] = useState<FuelType | null>(null);
+  const [fuelTypeManuallyEdited, setFuelTypeManuallyEdited] = useState(false);
   const [notes, setNotes] = useState('');
   const [receipt, setReceipt] = useState<ReceiptAttachment | null>(null);
 
@@ -115,13 +127,16 @@ export default function AddFuelEntryScreen() {
 
         setVehicles(data);
         setSelectedVehicleId((current) => {
-          if (current.length > 0) {
+          if (routeVehicleId.length > 0 && data.some((vehicle) => vehicle.id === routeVehicleId)) {
+            return routeVehicleId;
+          }
+          if (current.length > 0 && data.some((vehicle) => vehicle.id === current)) {
             return current;
           }
           if (data.length === 1) {
             return data[0].id;
           }
-          return current;
+          return '';
         });
       })
       .catch(() => {
@@ -140,7 +155,7 @@ export default function AddFuelEntryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [isFocused]);
+  }, [isFocused, routeVehicleId]);
 
   useEffect(() => {
     if (!selectedVehicleId) {
@@ -182,12 +197,32 @@ export default function AddFuelEntryScreen() {
   }, [selectedVehicleId]);
 
   useEffect(() => {
+    if (fuelTypeManuallyEdited) {
+      return;
+    }
     if (!selectedVehicleId) {
+      setFuelType(null);
+      return;
+    }
+
+    const selectedVehicle = vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
+    setFuelType(selectedVehicle?.defaultFuelType ?? null);
+  }, [fuelTypeManuallyEdited, selectedVehicleId, vehicles]);
+
+  useEffect(() => {
+    if (!selectedVehicleId) {
+      if (vehicles.length === 1) {
+        setSelectedVehicleId(vehicles[0].id);
+      }
       return;
     }
 
     const exists = vehicles.some((vehicle) => vehicle.id === selectedVehicleId);
     if (!exists) {
+      if (vehicles.length === 1) {
+        setSelectedVehicleId(vehicles[0].id);
+        return;
+      }
       setSelectedVehicleId('');
     }
   }, [selectedVehicleId, vehicles]);
@@ -196,6 +231,7 @@ export default function AddFuelEntryScreen() {
   const priceValue = parseDecimalValue(price);
   const odometerValue = parseIntegerValue(odometer);
   const avgConsumptionPreview = calculateAvgConsumption(litersValue, odometerValue, previousFuelKm);
+  const fuelTypeOptions = useMemo(() => buildFuelTypeOptions(t), [t]);
 
   const isDirty = useMemo(
     () =>
@@ -473,16 +509,19 @@ export default function AddFuelEntryScreen() {
               {vehiclesLoading ? (
                 <Input value={t('common.loadingVehicles')} editable={false} variant="subtle" />
               ) : hasVehicles ? (
-                <SelectField
-                  options={vehicles.map((vehicle) => ({
-                    value: vehicle.id,
-                    label: `${vehicle.name} (${vehicle.plate})`,
-                  }))}
+                <VehiclePickerField
+                  vehicles={vehicles}
                   value={selectedVehicleId || null}
                   onChange={(value) => {
                     setSelectedVehicleId(value);
                     setTouched((prev) => ({ ...prev, vehicleId: true }));
                   }}
+                  onBlur={() => setTouched((prev) => ({ ...prev, vehicleId: true }))}
+                  placeholder={t('common.selectVehicle')}
+                  searchPlaceholder={t('common.searchVehicles')}
+                  noResultsTitle={t('common.noVehiclesMatch')}
+                  noResultsDescription={t('common.tryDifferentVehicleSearch')}
+                  loading={vehiclesLoading}
                 />
               ) : (
                 <EmptyState
@@ -499,18 +538,11 @@ export default function AddFuelEntryScreen() {
               required
               error={showError('fuelType') ? errors.fuelType : null}>
               <SelectField
-                options={[
-                  { value: 'petrol', label: t('fuelForm.fuelType.petrol') },
-                  { value: 'diesel', label: t('fuelForm.fuelType.diesel') },
-                  { value: 'electric', label: t('fuelForm.fuelType.electric') },
-                  { value: 'hybrid', label: t('fuelForm.fuelType.hybrid') },
-                  { value: 'lpg', label: t('fuelForm.fuelType.lpg') },
-                  { value: 'cng', label: t('fuelForm.fuelType.cng') },
-                  { value: 'other', label: t('fuelForm.fuelType.other') },
-                ]}
+                options={fuelTypeOptions}
                 value={fuelType}
                 onChange={(value) => {
                   setFuelType(value as FuelType);
+                  setFuelTypeManuallyEdited(true);
                   setTouched((prev) => ({ ...prev, fuelType: true }));
                 }}
               />

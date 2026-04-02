@@ -1,5 +1,6 @@
 export { ActionIcon } from './action-icon';
 export { ActionRow } from './action-row';
+export { AccordionSection } from './accordion-section';
 export { AppText } from './app-text';
 export { Button } from './button';
 export { Card } from './card';

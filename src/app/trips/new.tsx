@@ -5,6 +5,7 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
+import { VehiclePickerField } from '@/components/vehicle/vehicle-picker-field';
 import { ActionIcon, Button, Card, DateTimeField, EmptyState, FormField, Input, SectionHeader, SelectField, TextArea } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { entriesRepo, tripsRepo, vehiclesRepo } from '@/data/repositories';
@@ -49,11 +50,20 @@ export default function AddTripScreen() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { t } = useI18n();
-  const params = useLocalSearchParams<{ vehicleId?: string }>();
+  const params = useLocalSearchParams<{ vehicleId?: string | string[] }>();
+  const routeVehicleId = useMemo(() => {
+    if (typeof params.vehicleId === 'string') {
+      return params.vehicleId.trim();
+    }
+    if (Array.isArray(params.vehicleId)) {
+      return params.vehicleId.map((entry) => entry.trim()).find((entry) => entry.length > 0) ?? '';
+    }
+    return '';
+  }, [params.vehicleId]);
 
   const [vehicles, setVehicles] = useState<VehicleListItem[]>([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
-  const [selectedVehicleId, setSelectedVehicleId] = useState((params.vehicleId ?? '').trim());
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
 
   const [latestRecordedKm, setLatestRecordedKm] = useState<number | null>(null);
   const [startOdometer, setStartOdometer] = useState('');
@@ -98,13 +108,16 @@ export default function AddTripScreen() {
 
         setVehicles(data);
         setSelectedVehicleId((current) => {
-          if (current.length > 0) {
+          if (routeVehicleId.length > 0 && data.some((vehicle) => vehicle.id === routeVehicleId)) {
+            return routeVehicleId;
+          }
+          if (current.length > 0 && data.some((vehicle) => vehicle.id === current)) {
             return current;
           }
           if (data.length === 1) {
             return data[0].id;
           }
-          return current;
+          return '';
         });
       })
       .catch(() => {
@@ -125,7 +138,7 @@ export default function AddTripScreen() {
     return () => {
       cancelled = true;
     };
-  }, [isFocused]);
+  }, [isFocused, routeVehicleId]);
 
   useEffect(() => {
     if (!selectedVehicleId) {
@@ -164,11 +177,18 @@ export default function AddTripScreen() {
 
   useEffect(() => {
     if (!selectedVehicleId) {
+      if (vehicles.length === 1) {
+        setSelectedVehicleId(vehicles[0].id);
+      }
       return;
     }
 
     const exists = vehicles.some((vehicle) => vehicle.id === selectedVehicleId);
     if (!exists) {
+      if (vehicles.length === 1) {
+        setSelectedVehicleId(vehicles[0].id);
+        return;
+      }
       setSelectedVehicleId('');
     }
   }, [selectedVehicleId, vehicles]);
@@ -369,16 +389,19 @@ export default function AddTripScreen() {
               {vehiclesLoading ? (
                 <Input value={t('common.loadingVehicles')} editable={false} variant="subtle" />
               ) : hasVehicles ? (
-                <SelectField
-                  options={vehicles.map((vehicle) => ({
-                    value: vehicle.id,
-                    label: `${vehicle.name} (${vehicle.plate})`,
-                  }))}
+                <VehiclePickerField
+                  vehicles={vehicles}
                   value={selectedVehicleId || null}
                   onChange={(value) => {
                     setSelectedVehicleId(value);
                     setTouched((prev) => ({ ...prev, vehicleId: true }));
                   }}
+                  onBlur={() => setTouched((prev) => ({ ...prev, vehicleId: true }))}
+                  placeholder={t('common.selectVehicle')}
+                  searchPlaceholder={t('common.searchVehicles')}
+                  noResultsTitle={t('common.noVehiclesMatch')}
+                  noResultsDescription={t('common.tryDifferentVehicleSearch')}
+                  loading={vehiclesLoading}
                 />
               ) : (
                 <EmptyState

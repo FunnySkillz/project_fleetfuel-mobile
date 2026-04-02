@@ -147,6 +147,13 @@ function normalizeYear(value: number | null | undefined) {
   return value;
 }
 
+function formatLocalDay(value: Date) {
+  const year = String(value.getFullYear());
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function normalizeDateRange(input: {
   fromDate?: string | null;
   toDate?: string | null;
@@ -160,8 +167,10 @@ function normalizeDateRange(input: {
   let normalizedToDate = toDate;
 
   if (!normalizedFromDate && !normalizedToDate && year !== null) {
+    const now = new Date();
+    const currentYear = now.getFullYear();
     normalizedFromDate = `${year}-01-01`;
-    normalizedToDate = `${year}-12-31`;
+    normalizedToDate = year === currentYear ? formatLocalDay(now) : `${year}-12-31`;
   }
 
   const fromIso = buildDayRangeIso(normalizedFromDate, 'start');

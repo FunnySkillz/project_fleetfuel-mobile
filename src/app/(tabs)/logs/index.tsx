@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
 import {
+  AccordionSection,
+  AppText,
   Button,
   Card,
   DateTimeField,
@@ -15,22 +17,15 @@ import {
   ListRow,
   SectionHeader,
   SelectField,
-  AppText,
 } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { logsRepo, vehiclesRepo } from '@/data/repositories';
-import type {
-  EntrySummary,
-  ExportPreview,
-  FuelTypeFilter,
-  LogsExportFilters,
-  TripUsageFilter,
-  VehicleListItem,
-} from '@/data/types';
+import type { EntrySummary, ExportPreview, FuelTypeFilter, LogsExportFilters, TripUsageFilter, VehicleListItem } from '@/data/types';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { generateLogsPdf } from '@/services/export/generate-logs-pdf';
+import { buildFuelTypeFilterOptions } from '@/utils/fuel-type-options';
 
 function formatDate(iso: string) {
   const parsed = new Date(iso);
@@ -49,7 +44,22 @@ function isValidDayDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function formatLocalDay(value: Date) {
+  const year = String(value.getFullYear());
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function resolvePeriodRange(year: number, currentYear: number, todayLocal: string) {
+  return {
+    fromDate: `${year}-01-01`,
+    toDate: year === currentYear ? todayLocal : `${year}-12-31`,
+  };
+}
+
 const USAGE_OPTIONS: TripUsageFilter[] = ['both', 'work', 'private', 'unclassified'];
+type SecondaryAccordionKey = 'tripUsage' | 'fuelType' | 'dataScope';
 type LogsValidationErrorKey =
   | 'logs.validation.vehicleScopeRequired'
   | 'logs.validation.fromDateFormat'
@@ -62,8 +72,27 @@ export default function LogsScreen() {
   const theme = useTheme();
   const { t } = useI18n();
 
-  const currentYear = new Date().getUTCFullYear();
-  const yearOptions = useMemo(() => [null, currentYear, currentYear - 1, currentYear - 2], [currentYear]);
+  const now = useMemo(() => new Date(), []);
+  const currentYear = now.getFullYear();
+  const todayLocal = formatLocalDay(now);
+  const currentYearPeriod = useMemo(() => resolvePeriodRange(currentYear, currentYear, todayLocal), [currentYear, todayLocal]);
+  const yearOptions = useMemo(() => [currentYear, currentYear - 1, currentYear - 2], [currentYear]);
+  const usageOptions = useMemo(
+    () =>
+      USAGE_OPTIONS.map((value) => ({
+        value,
+        label:
+          value === 'work'
+            ? t('logs.option.usageWork')
+            : value === 'private'
+              ? t('logs.option.usagePrivate')
+              : value === 'unclassified'
+                ? t('logs.option.usageUnclassified')
+                : t('logs.option.usageBoth'),
+      })),
+    [t],
+  );
+  const fuelTypeOptions = useMemo(() => buildFuelTypeFilterOptions(t), [t]);
 
   const [vehicles, setVehicles] = useState<VehicleListItem[]>([]);
   const [vehiclesStatus, setVehiclesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -71,13 +100,17 @@ export default function LogsScreen() {
   const [allVehiclesScope, setAllVehiclesScope] = useState(true);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
 
-  const [year, setYear] = useState<number | null>(currentYear);
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [year, setYear] = useState(currentYear);
+  const [fromDate, setFromDate] = useState(currentYearPeriod.fromDate);
+  const [toDate, setToDate] = useState(currentYearPeriod.toDate);
   const [usageType, setUsageType] = useState<TripUsageFilter>('both');
   const [fuelType, setFuelType] = useState<FuelTypeFilter>('all');
   const [includeFuel, setIncludeFuel] = useState(true);
   const [includeReceipts, setIncludeReceipts] = useState(false);
+
+  const [isVehicleScopeOpen, setIsVehicleScopeOpen] = useState(true);
+  const [isPeriodOpen, setIsPeriodOpen] = useState(true);
+  const [openSecondary, setOpenSecondary] = useState<SecondaryAccordionKey | null>(null);
 
   const [preview, setPreview] = useState<ExportPreview | null>(null);
   const [previewStatus, setPreviewStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -125,6 +158,20 @@ export default function LogsScreen() {
     return null;
   }, [allVehiclesScope, fromDate, selectedVehicleIds.length, toDate]);
 
+  useEffect(() => {
+    if (validationErrorKey === 'logs.validation.vehicleScopeRequired') {
+      setIsVehicleScopeOpen(true);
+    }
+
+    if (
+      validationErrorKey === 'logs.validation.fromDateFormat' ||
+      validationErrorKey === 'logs.validation.toDateFormat' ||
+      validationErrorKey === 'logs.validation.dateRange'
+    ) {
+      setIsPeriodOpen(true);
+    }
+  }, [validationErrorKey]);
+
   const validationError = validationErrorKey ? t(validationErrorKey) : null;
 
   const exportFilters = useMemo<Partial<LogsExportFilters>>(
@@ -145,8 +192,8 @@ export default function LogsScreen() {
     !allVehiclesScope ||
     selectedVehicleIds.length > 0 ||
     year !== currentYear ||
-    fromDate.trim().length > 0 ||
-    toDate.trim().length > 0 ||
+    fromDate !== currentYearPeriod.fromDate ||
+    toDate !== currentYearPeriod.toDate ||
     usageType !== 'both' ||
     fuelType !== 'all' ||
     !includeFuel ||
@@ -280,11 +327,28 @@ export default function LogsScreen() {
     });
   };
 
-  const handleSelectYear = (nextYear: number | null) => {
-    setYear(nextYear);
-    setFromDate('');
-    setToDate('');
-  };
+  const applyYearDefaults = useCallback(
+    (nextYear: number) => {
+      const period = resolvePeriodRange(nextYear, currentYear, todayLocal);
+      setYear(nextYear);
+      setFromDate(period.fromDate);
+      setToDate(period.toDate);
+    },
+    [currentYear, todayLocal],
+  );
+
+  const handleResetFilters = useCallback(() => {
+    setAllVehiclesScope(true);
+    setSelectedVehicleIds([]);
+    applyYearDefaults(currentYear);
+    setUsageType('both');
+    setFuelType('all');
+    setIncludeFuel(true);
+    setIncludeReceipts(false);
+    setIsVehicleScopeOpen(true);
+    setIsPeriodOpen(true);
+    setOpenSecondary(null);
+  }, [applyYearDefaults, currentYear]);
 
   const handleGeneratePdf = async () => {
     if (exportingPdf) {
@@ -316,10 +380,33 @@ export default function LogsScreen() {
     }
   };
 
-  const yearValue = year === null ? 'all' : String(year);
+  const yearValue = String(year);
   const dataScopeValues = [includeFuel ? 'fuel' : null, includeReceipts ? 'receipts' : null].filter(
     (value): value is string => Boolean(value),
   );
+
+  const vehicleScopeSummary = allVehiclesScope
+    ? t('logs.summary.allVehicles')
+    : selectedVehicleIds.length === 0
+      ? t('logs.summary.noVehicleSelected')
+      : t('logs.summary.selectedVehicles', { count: selectedVehicleIds.length });
+  const periodSummary = t('logs.summary.periodRange', {
+    from: fromDate.trim() || '----',
+    to: toDate.trim() || '----',
+  });
+  const usageSummary = usageOptions.find((option) => option.value === usageType)?.label ?? t('logs.option.usageBoth');
+  const fuelTypeSummary = fuelTypeOptions.find((option) => option.value === fuelType)?.label ?? t('common.fuelType.all');
+  const dataScopeSummary = includeFuel
+    ? includeReceipts
+      ? t('logs.summary.dataScopeFuelAndReceipts')
+      : t('logs.summary.dataScopeFuelOnly')
+    : includeReceipts
+      ? t('logs.summary.dataScopeReceiptsOnly')
+      : t('logs.summary.dataScopeNone');
+
+  const toggleSecondaryAccordion = (key: SecondaryAccordionKey) => {
+    setOpenSecondary((current) => (current === key ? null : key));
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -328,9 +415,15 @@ export default function LogsScreen() {
           <SectionHeader
             title={t('logs.title')}
             description={t('logs.description')}
+            actionLabel={t('logs.action.reset')}
+            onAction={handleResetFilters}
           />
 
-          <Card className="gap-3">
+          <AccordionSection
+            title={t('logs.field.vehicleScope')}
+            summary={vehicleScopeSummary}
+            open={isVehicleScopeOpen}
+            onToggle={() => setIsVehicleScopeOpen((current) => !current)}>
             <FormField
               label={t('logs.field.vehicleScope')}
               error={validationErrorKey === 'logs.validation.vehicleScopeRequired' ? validationError : null}>
@@ -360,22 +453,26 @@ export default function LogsScreen() {
                 )}
               </FormField>
             ) : null}
+          </AccordionSection>
 
+          <AccordionSection
+            title={t('logs.field.period')}
+            summary={periodSummary}
+            open={isPeriodOpen}
+            onToggle={() => setIsPeriodOpen((current) => !current)}>
             <FormField label={t('logs.field.period')}>
               <SelectField
                 options={yearOptions.map((option) => ({
-                  value: option === null ? 'all' : String(option),
-                  label: option === null ? t('common.allDates') : String(option),
+                  value: String(option),
+                  label: String(option),
                 }))}
                 value={yearValue}
                 onChange={(value) => {
-                  if (value === 'all') {
-                    handleSelectYear(null);
+                  const parsedYear = Number.parseInt(value, 10);
+                  if (Number.isNaN(parsedYear)) {
                     return;
                   }
-
-                  const parsedYear = Number.parseInt(value, 10);
-                  handleSelectYear(Number.isNaN(parsedYear) ? null : parsedYear);
+                  applyYearDefaults(parsedYear);
                 }}
               />
             </FormField>
@@ -390,9 +487,6 @@ export default function LogsScreen() {
                     value={fromDate}
                     onChangeText={(value) => {
                       setFromDate(sanitizeDayDateInput(value));
-                      if (value.trim().length > 0) {
-                        setYear(null);
-                      }
                     }}
                     onClear={() => {
                       setFromDate('');
@@ -417,9 +511,6 @@ export default function LogsScreen() {
                     value={toDate}
                     onChangeText={(value) => {
                       setToDate(sanitizeDayDateInput(value));
-                      if (value.trim().length > 0) {
-                        setYear(null);
-                      }
                     }}
                     onClear={() => {
                       setToDate('');
@@ -435,42 +526,33 @@ export default function LogsScreen() {
                 </FormField>
               </View>
             </View>
+          </AccordionSection>
 
+          <AccordionSection
+            title={t('logs.field.usageType')}
+            summary={usageSummary}
+            open={openSecondary === 'tripUsage'}
+            onToggle={() => toggleSecondaryAccordion('tripUsage')}>
             <FormField label={t('logs.field.usageType')}>
-              <SelectField
-                options={USAGE_OPTIONS.map((value) => ({
-                  value,
-                  label:
-                    value === 'work'
-                      ? t('logs.option.usageWork')
-                      : value === 'private'
-                        ? t('logs.option.usagePrivate')
-                        : value === 'unclassified'
-                          ? t('logs.option.usageUnclassified')
-                          : t('logs.option.usageBoth'),
-                }))}
-                value={usageType}
-                onChange={(value) => setUsageType(value as TripUsageFilter)}
-              />
+              <SelectField options={usageOptions} value={usageType} onChange={(value) => setUsageType(value as TripUsageFilter)} />
             </FormField>
+          </AccordionSection>
 
+          <AccordionSection
+            title={t('logs.field.fuelType')}
+            summary={fuelTypeSummary}
+            open={openSecondary === 'fuelType'}
+            onToggle={() => toggleSecondaryAccordion('fuelType')}>
             <FormField label={t('logs.field.fuelType')}>
-              <SelectField
-                options={[
-                  { value: 'all', label: t('logs.option.fuelTypeAll') },
-                  { value: 'petrol', label: t('logs.option.fuelTypePetrol') },
-                  { value: 'diesel', label: t('logs.option.fuelTypeDiesel') },
-                  { value: 'electric', label: t('logs.option.fuelTypeElectric') },
-                  { value: 'hybrid', label: t('logs.option.fuelTypeHybrid') },
-                  { value: 'lpg', label: t('logs.option.fuelTypeLpg') },
-                  { value: 'cng', label: t('logs.option.fuelTypeCng') },
-                  { value: 'other', label: t('logs.option.fuelTypeOther') },
-                ]}
-                value={fuelType}
-                onChange={(value) => setFuelType(value as FuelTypeFilter)}
-              />
+              <SelectField options={fuelTypeOptions} value={fuelType} onChange={(value) => setFuelType(value as FuelTypeFilter)} />
             </FormField>
+          </AccordionSection>
 
+          <AccordionSection
+            title={t('logs.field.dataScope')}
+            summary={dataScopeSummary}
+            open={openSecondary === 'dataScope'}
+            onToggle={() => toggleSecondaryAccordion('dataScope')}>
             <FormField label={t('logs.field.dataScope')}>
               <SelectField
                 multi
@@ -489,41 +571,57 @@ export default function LogsScreen() {
                 }}
               />
             </FormField>
+          </AccordionSection>
 
-            <Card variant="outline" className="gap-1.5">
-              <AppText variant="label">{t('logs.preview.title')}</AppText>
-              {previewStatus === 'loading' ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator color={theme.textSecondary} />
-                  <AppText variant="caption" color="secondary">{t('logs.preview.calculating')}</AppText>
-                </View>
-              ) : previewStatus === 'error' || !preview ? (
-                <AppText variant="caption" color="destructive">
-                  {previewError ?? t('logs.preview.errorFallback')}
+          <Card variant="outline" className="gap-1.5">
+            <AppText variant="label">{t('logs.preview.title')}</AppText>
+            {previewStatus === 'loading' ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color={theme.textSecondary} />
+                <AppText variant="caption" color="secondary">
+                  {t('logs.preview.calculating')}
                 </AppText>
-              ) : (
-                <View style={styles.previewGrid}>
-                  <AppText variant="caption" color="secondary">{t('logs.preview.vehicleCount', { value: preview.vehicleCount })}</AppText>
-                  <AppText variant="caption" color="secondary">{t('logs.preview.tripCount', { value: preview.tripCount })}</AppText>
-                  <AppText variant="caption" color="secondary">{t('logs.preview.fuelCount', { value: preview.fuelCount })}</AppText>
-                  <AppText variant="caption" color="secondary">{t('logs.preview.totalDistance', { value: preview.totalDistanceKm })}</AppText>
-                  <AppText variant="caption" color="secondary">{t('logs.preview.workDistance', { value: preview.businessDistanceKm })}</AppText>
-                  <AppText variant="caption" color="secondary">{t('logs.preview.privateDistance', { value: preview.privateDistanceKm })}</AppText>
-                  <AppText variant="caption" color="secondary">{t('logs.preview.unclassifiedDistance', { value: preview.unclassifiedDistanceKm })}</AppText>
-                  <AppText variant="caption" color="secondary">
-                    {t('logs.preview.fuelSpend', { value: preview.fuelSpendTotal.toFixed(2) })}
-                  </AppText>
-                </View>
-              )}
-            </Card>
-
-            <Button
-              variant="primary"
-              label={exportingPdf ? t('logs.generatingPdf') : t('logs.generatePdf')}
-              onPress={() => void handleGeneratePdf()}
-              disabled={exportingPdf || Boolean(validationErrorKey)}
-            />
+              </View>
+            ) : previewStatus === 'error' || !preview ? (
+              <AppText variant="caption" color="destructive">
+                {previewError ?? t('logs.preview.errorFallback')}
+              </AppText>
+            ) : (
+              <View style={styles.previewGrid}>
+                <AppText variant="caption" color="secondary">
+                  {t('logs.preview.vehicleCount', { value: preview.vehicleCount })}
+                </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('logs.preview.tripCount', { value: preview.tripCount })}
+                </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('logs.preview.fuelCount', { value: preview.fuelCount })}
+                </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('logs.preview.totalDistance', { value: preview.totalDistanceKm })}
+                </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('logs.preview.workDistance', { value: preview.businessDistanceKm })}
+                </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('logs.preview.privateDistance', { value: preview.privateDistanceKm })}
+                </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('logs.preview.unclassifiedDistance', { value: preview.unclassifiedDistanceKm })}
+                </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('logs.preview.fuelSpend', { value: preview.fuelSpendTotal.toFixed(2) })}
+                </AppText>
+              </View>
+            )}
           </Card>
+
+          <Button
+            variant="primary"
+            label={exportingPdf ? t('logs.generatingPdf') : t('logs.generatePdf')}
+            onPress={() => void handleGeneratePdf()}
+            disabled={exportingPdf || Boolean(validationErrorKey)}
+          />
 
           <Card className="gap-2">
             <SectionHeader
@@ -549,7 +647,9 @@ export default function LogsScreen() {
                 {timelineStatus === 'loading' ? (
                   <View style={styles.loadingRow}>
                     <ActivityIndicator color={theme.textSecondary} />
-                    <AppText variant="caption" color="secondary">{t('logs.timeline.loading')}</AppText>
+                    <AppText variant="caption" color="secondary">
+                      {t('logs.timeline.loading')}
+                    </AppText>
                   </View>
                 ) : timelineStatus === 'error' ? (
                   <AppText variant="caption" color="destructive">
@@ -623,5 +723,4 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
 });
-
 

@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import { DATABASE_NAME, SCHEMA_VERSION } from '@/data/schema';
+import { FUEL_TYPES } from '@/data/types';
 
 export { DATABASE_NAME, SCHEMA_VERSION };
 
@@ -128,6 +129,23 @@ async function migrateToV4(db: SQLite.SQLiteDatabase) {
   await addColumnIfMissing(db, 'fuel_entries', 'fuel_type', 'TEXT');
 }
 
+async function migrateToV5(db: SQLite.SQLiteDatabase) {
+  const fuelTypesSqlList = FUEL_TYPES.map((value) => `'${value}'`).join(', ');
+
+  await addColumnIfMissing(
+    db,
+    'vehicles',
+    'current_odometer_km',
+    'INTEGER NOT NULL DEFAULT 0 CHECK (current_odometer_km >= 0)',
+  );
+  await addColumnIfMissing(
+    db,
+    'vehicles',
+    'default_fuel_type',
+    `TEXT NOT NULL DEFAULT '${FUEL_TYPES[0]}' CHECK (default_fuel_type IN (${fuelTypesSqlList}))`,
+  );
+}
+
 async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL;');
   await db.execAsync('PRAGMA foreign_keys = ON;');
@@ -146,6 +164,9 @@ async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   }
   if (currentVersion < 4) {
     await migrateToV4(db);
+  }
+  if (currentVersion < 5) {
+    await migrateToV5(db);
   }
 
   if (currentVersion !== SCHEMA_VERSION) {
