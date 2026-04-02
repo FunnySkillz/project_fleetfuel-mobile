@@ -123,26 +123,40 @@ export default function EntryDetailScreen() {
       return;
     }
 
-    Alert.alert(t('entryDetail.deleteTitle'), t('entryDetail.deleteMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('entryDetail.deleteAction'),
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            setDeleting(true);
-            try {
-              await entriesRepo.delete(entry.id);
-              router.back();
-            } catch (error) {
-              Alert.alert(t('entryDetail.deleteFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
-            } finally {
-              setDeleting(false);
-            }
-          })();
+    void (async () => {
+      let deleteMessage = t('entryDetail.deleteMessage');
+
+      try {
+        const latest = await entriesRepo.resolveLatestEntryOdometer(entry.vehicleId);
+        const isLatestEntry = latest && latest.entryId === entry.id && latest.entryType === entry.type;
+        if (latest && !isLatestEntry) {
+          deleteMessage = `${deleteMessage}\n\n${t('entryDetail.deleteOlderWarning')}`;
+        }
+      } catch {
+        // Ignore warning lookup failures and continue with delete confirmation.
+      }
+
+      Alert.alert(t('entryDetail.deleteTitle'), deleteMessage, [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('entryDetail.deleteAction'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setDeleting(true);
+              try {
+                await entriesRepo.delete(entry.id);
+                router.back();
+              } catch (error) {
+                Alert.alert(t('entryDetail.deleteFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
+              } finally {
+                setDeleting(false);
+              }
+            })();
+          },
         },
-      },
-    ]);
+      ]);
+    })();
   };
 
   const openReceipt = async () => {
