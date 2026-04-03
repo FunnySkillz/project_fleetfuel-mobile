@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ReasonRequiredModal } from '@/components/reason-required-modal';
 import { ThemedView } from '@/components/themed-view';
 import { ActionIcon, AppText, Button, Card, EmptyState, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -80,6 +81,7 @@ export default function EntryDetailScreen() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [reasonModalVisible, setReasonModalVisible] = useState(false);
 
   const loadEntry = useCallback(async () => {
     if (!entryId) {
@@ -142,17 +144,7 @@ export default function EntryDetailScreen() {
           text: t('entryDetail.deleteAction'),
           style: 'destructive',
           onPress: () => {
-            void (async () => {
-              setDeleting(true);
-              try {
-                await entriesRepo.delete(entry.id);
-                router.back();
-              } catch (error) {
-                Alert.alert(t('entryDetail.deleteFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
-              } finally {
-                setDeleting(false);
-              }
-            })();
+            setReasonModalVisible(true);
           },
         },
       ]);
@@ -225,6 +217,14 @@ export default function EntryDetailScreen() {
                   <>
                     <DetailLine label={t('entryDetail.field.fuelType')} value={fuelTypeLabel(entry.fuelType, t)} />
                     <DetailLine label={t('entryDetail.field.liters')} value={`${entry.liters.toFixed(2)} L`} />
+                    <DetailLine
+                      label={t('entryDetail.field.fuelInTankAfterRefuel')}
+                      value={
+                        entry.fuelInTankAfterRefuelLiters !== null
+                          ? `${entry.fuelInTankAfterRefuelLiters.toFixed(2)} L`
+                          : t('common.notAvailable')
+                      }
+                    />
                     <DetailLine label={t('entryDetail.field.totalPrice')} value={`EUR ${entry.totalPrice.toFixed(2)}`} />
                     <DetailLine label={t('entryDetail.field.station')} value={entry.station} />
                     <DetailLine label={t('entryDetail.field.odometer')} value={entry.odometerKm !== null ? String(entry.odometerKm) : t('common.notAvailable')} />
@@ -281,6 +281,37 @@ export default function EntryDetailScreen() {
             </>
           )}
         </ScrollView>
+        <ReasonRequiredModal
+          visible={reasonModalVisible}
+          title={t('audit.reason.entryDeleteTitle')}
+          description={t('audit.reason.entryDeleteDescription')}
+          confirmLabel={t('audit.reason.deleteAction')}
+          submitting={deleting}
+          onCancel={() => {
+            if (deleting) {
+              return;
+            }
+            setReasonModalVisible(false);
+          }}
+          onConfirm={(reason) => {
+            if (!entry || deleting) {
+              return;
+            }
+
+            void (async () => {
+              setDeleting(true);
+              try {
+                await entriesRepo.delete(entry.id, { reason });
+                setReasonModalVisible(false);
+                router.back();
+              } catch (error) {
+                Alert.alert(t('entryDetail.deleteFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
+              } finally {
+                setDeleting(false);
+              }
+            })();
+          }}
+        />
       </SafeAreaView>
     </ThemedView>
   );
