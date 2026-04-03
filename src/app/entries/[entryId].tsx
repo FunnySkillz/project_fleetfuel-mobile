@@ -1,6 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState, type ReactNode } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -74,8 +74,16 @@ export default function EntryDetailScreen() {
   const theme = useTheme();
   const { t } = useI18n();
   const isFocused = useIsFocused();
-  const params = useLocalSearchParams<{ entryId?: string }>();
-  const entryId = (params.entryId ?? '').trim();
+  const params = useLocalSearchParams<{ entryId?: string | string[] }>();
+  const entryId = useMemo(() => {
+    if (typeof params.entryId === 'string') {
+      return params.entryId.trim();
+    }
+    if (Array.isArray(params.entryId)) {
+      return params.entryId.map((value) => value.trim()).find((value) => value.length > 0) ?? '';
+    }
+    return '';
+  }, [params.entryId]);
 
   const [entry, setEntry] = useState<EntryDetail | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
