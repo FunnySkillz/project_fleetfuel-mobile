@@ -55,6 +55,7 @@ type FuelExportRow = {
   occurred_at: string;
   fuel_type: ExportFuelRow['fuelType'];
   liters: number;
+  fuel_in_tank_after_refuel_liters: number | null;
   total_price: number;
   station: string;
   odometer_km: number | null;
@@ -264,6 +265,7 @@ function mapFuelExportRow(row: FuelExportRow): ExportFuelRow {
     occurredAt: row.occurred_at,
     fuelType: row.fuel_type,
     liters: row.liters,
+    fuelInTankAfterRefuelLiters: row.fuel_in_tank_after_refuel_liters,
     totalPrice: row.total_price,
     station: row.station,
     odometerKm: row.odometer_km,
@@ -418,6 +420,7 @@ async function queryFuelForExport(
         f.occurred_at,
         f.fuel_type,
         f.liters,
+        f.fuel_in_tank_after_refuel_liters,
         f.total_price,
         f.station,
         f.odometer_km,
