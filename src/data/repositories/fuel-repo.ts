@@ -511,6 +511,7 @@ export const fuelRepo = {
         createdAt: current.created_at,
         updatedAt: timestamp,
       };
+      const movedToDifferentVehicle = current.vehicle_id !== normalized.vehicleId;
 
       await changeHistoryRepo.recordUpdateTx(txn, {
         vehicleId: normalized.vehicleId,
@@ -520,11 +521,31 @@ export const fuelRepo = {
         before: beforeSnapshot as unknown as Record<string, unknown>,
         after: updatedRecord as unknown as Record<string, unknown>,
         metadata:
-          current.vehicle_id !== normalized.vehicleId
-            ? { previousVehicleId: current.vehicle_id, nextVehicleId: normalized.vehicleId }
+          movedToDifferentVehicle
+            ? {
+                previousVehicleId: current.vehicle_id,
+                nextVehicleId: normalized.vehicleId,
+                perspective: 'destination',
+              }
             : null,
         occurredAt: timestamp,
       });
+      if (movedToDifferentVehicle) {
+        await changeHistoryRepo.recordUpdateTx(txn, {
+          vehicleId: current.vehicle_id,
+          entityType: 'fuel',
+          entityId: id,
+          audit,
+          before: beforeSnapshot as unknown as Record<string, unknown>,
+          after: updatedRecord as unknown as Record<string, unknown>,
+          metadata: {
+            previousVehicleId: current.vehicle_id,
+            nextVehicleId: normalized.vehicleId,
+            perspective: 'source',
+          },
+          occurredAt: timestamp,
+        });
+      }
 
       return updatedRecord;
     });
