@@ -146,6 +146,48 @@ async function migrateToV5(db: SQLite.SQLiteDatabase) {
   );
 }
 
+async function migrateToV6(_db: SQLite.SQLiteDatabase) {
+  // Reserved migration slot (no-op).
+}
+
+async function migrateToV7(db: SQLite.SQLiteDatabase) {
+  await addColumnIfMissing(
+    db,
+    'fuel_entries',
+    'fuel_in_tank_after_refuel_liters',
+    'REAL CHECK (fuel_in_tank_after_refuel_liters >= 0)',
+  );
+
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS change_history (
+      id TEXT PRIMARY KEY NOT NULL,
+      vehicle_id TEXT NOT NULL,
+      entity_type TEXT NOT NULL CHECK (entity_type IN ('vehicle', 'trip', 'fuel')),
+      entity_id TEXT NOT NULL,
+      action_type TEXT NOT NULL CHECK (action_type IN ('update', 'delete')),
+      reason TEXT NOT NULL,
+      actor_type TEXT NOT NULL CHECK (actor_type IN ('local_user', 'system')),
+      actor_id TEXT NOT NULL,
+      changed_fields_json TEXT NOT NULL,
+      before_json TEXT NOT NULL,
+      after_json TEXT,
+      metadata_json TEXT,
+      occurred_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_change_history_vehicle_occurred
+    ON change_history(vehicle_id, occurred_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_change_history_entity_occurred
+    ON change_history(entity_type, entity_id, occurred_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_change_history_action_occurred
+    ON change_history(action_type, occurred_at DESC);
+  `);
+}
+
 async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL;');
   await db.execAsync('PRAGMA foreign_keys = ON;');
@@ -167,6 +209,12 @@ async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   }
   if (currentVersion < 5) {
     await migrateToV5(db);
+  }
+  if (currentVersion < 6) {
+    await migrateToV6(db);
+  }
+  if (currentVersion < 7) {
+    await migrateToV7(db);
   }
 
   if (currentVersion !== SCHEMA_VERSION) {
@@ -228,7 +276,7 @@ export async function checkDatabaseHealth(): Promise<void> {
       SELECT COUNT(1) AS table_count
       FROM sqlite_master
       WHERE type = 'table'
-        AND name IN ('vehicles', 'trips', 'fuel_entries')
+        AND name IN ('vehicles', 'trips', 'fuel_entries', 'change_history')
     `,
   );
 }
