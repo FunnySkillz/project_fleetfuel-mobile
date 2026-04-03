@@ -20,6 +20,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { buildFuelTypeOptions } from '@/utils/fuel-type-options';
 import { parseIntegerValue, sanitizeIntegerInput, sanitizePlateInput, trimmedLength } from '@/utils/form-input';
+import { isReasonPromptCancelledError } from '@/utils/reason-prompt';
 import { kwFromPs, psFromKw } from '@/utils/vehicle-power';
 
 const VEHICLE_NAME_MIN = 2;
@@ -397,6 +398,9 @@ export function VehicleFormScreen({
       allowNextNavigation();
       onSubmitSuccess?.();
     } catch (error) {
+      if (isReasonPromptCancelledError(error)) {
+        return;
+      }
       Alert.alert(t('vehicleForm.alert.saveFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
     } finally {
       setSaving(false);
