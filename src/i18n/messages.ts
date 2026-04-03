@@ -403,6 +403,7 @@ export const enMessages = {
   'vehicles.noActivityYet': 'No activity yet',
   'vehicles.listSubtitle': '{plate} | Trips: {tripCount} | Fuel: {fuelCount}',
   'vehicles.listSubtitleWithSpecs': '{specs} | {plate} | Trips: {tripCount} | Fuel: {fuelCount}',
+  'vehicles.swipeDeleteAction': 'Delete',
 
   'vehicleDetail.loading': 'Loading vehicle insight...',
   'vehicleDetail.errorMissingId': 'Missing vehicle id.',
@@ -439,7 +440,7 @@ export const enMessages = {
   'vehicleDetail.deleteFailedTitle': 'Could not delete vehicle',
 
   'entryDetail.title': 'Entry Detail',
-  'entryDetail.descriptionLoaded': 'Entry ID: {id}',
+  'entryDetail.descriptionLoaded': 'Review your selected entry.',
   'entryDetail.descriptionLoading': 'Loading selected entry.',
   'entryDetail.loading': 'Loading entry...',
   'entryDetail.errorMissingId': 'Missing entry id.',
@@ -989,6 +990,7 @@ export const deMessages: Partial<Record<TranslationKey, string>> = {
   'vehicles.noActivityYet': 'Noch keine Aktivitaet',
   'vehicles.listSubtitle': '{plate} | Fahrten: {tripCount} | Tanken: {fuelCount}',
   'vehicles.listSubtitleWithSpecs': '{specs} | {plate} | Fahrten: {tripCount} | Tanken: {fuelCount}',
+  'vehicles.swipeDeleteAction': 'Loeschen',
 
   'vehicleDetail.loading': 'Fahrzeug-Insight wird geladen...',
   'vehicleDetail.errorMissingId': 'Fahrzeug-ID fehlt.',
@@ -1025,7 +1027,7 @@ export const deMessages: Partial<Record<TranslationKey, string>> = {
   'vehicleDetail.deleteFailedTitle': 'Fahrzeug konnte nicht geloescht werden',
 
   'entryDetail.title': 'Eintragsdetails',
-  'entryDetail.descriptionLoaded': 'Eintrags-ID: {id}',
+  'entryDetail.descriptionLoaded': 'Details zum ausgewaehlten Eintrag.',
   'entryDetail.descriptionLoading': 'Ausgewaehlter Eintrag wird geladen.',
   'entryDetail.loading': 'Eintrag wird geladen...',
   'entryDetail.errorMissingId': 'Eintrags-ID fehlt.',
