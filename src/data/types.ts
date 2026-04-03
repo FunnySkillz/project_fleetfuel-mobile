@@ -5,6 +5,32 @@ export type TripUsageFilter = 'both' | 'work' | 'private' | 'unclassified';
 export const FUEL_TYPES = ['petrol', 'diesel', 'electric', 'hybrid', 'lpg', 'cng', 'other'] as const;
 export type FuelType = (typeof FUEL_TYPES)[number];
 export type FuelTypeFilter = FuelType | 'all';
+export type ChangeHistoryEntityType = 'vehicle' | 'trip' | 'fuel';
+export type ChangeHistoryActionType = 'update' | 'delete';
+export type ChangeHistoryActorType = 'local_user' | 'system';
+
+export type ChangeFieldDiff = {
+  field: string;
+  before: unknown;
+  after: unknown;
+};
+
+export type ChangeHistoryRecord = {
+  id: string;
+  vehicleId: string;
+  entityType: ChangeHistoryEntityType;
+  entityId: string;
+  actionType: ChangeHistoryActionType;
+  reason: string;
+  actorType: ChangeHistoryActorType;
+  actorId: string;
+  changedFields: ChangeFieldDiff[];
+  before: Record<string, unknown>;
+  after: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  occurredAt: string;
+  createdAt: string;
+};
 
 export type ReceiptAttachment = {
   uri: string;
@@ -60,6 +86,7 @@ export type FuelEntryRecord = {
   occurredAt: string;
   fuelType: FuelType | null;
   liters: number;
+  fuelInTankAfterRefuelLiters: number | null;
   totalPrice: number;
   station: string;
   odometerKm: number | null;
@@ -139,6 +166,7 @@ export type ExportFuelRow = {
   occurredAt: string;
   fuelType: FuelType | null;
   liters: number;
+  fuelInTankAfterRefuelLiters: number | null;
   totalPrice: number;
   station: string;
   odometerKm: number | null;
@@ -239,6 +267,7 @@ export type FuelEntryDetail = {
   occurredAt: string;
   fuelType: FuelType | null;
   liters: number;
+  fuelInTankAfterRefuelLiters: number | null;
   totalPrice: number;
   station: string;
   odometerKm: number | null;
