@@ -180,7 +180,7 @@ export default function EntryDetailScreen() {
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
-          <SectionHeader title={t('entryDetail.title')} description={entry ? t('entryDetail.descriptionLoaded', { id: entry.id }) : t('entryDetail.descriptionLoading')} />
+          <SectionHeader title={t('entryDetail.title')} description={entry ? t('entryDetail.descriptionLoaded') : t('entryDetail.descriptionLoading')} />
 
           {status === 'loading' ? (
             <Card className="gap-2">
