@@ -1,6 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,7 +21,15 @@ export default function EditVehicleScreen() {
   const theme = useTheme();
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ vehicleId?: string | string[] }>();
-  const vehicleId = typeof params.vehicleId === 'string' ? params.vehicleId.trim() : '';
+  const vehicleId = useMemo(() => {
+    if (typeof params.vehicleId === 'string') {
+      return params.vehicleId.trim();
+    }
+    if (Array.isArray(params.vehicleId)) {
+      return params.vehicleId.map((value) => value.trim()).find((value) => value.length > 0) ?? '';
+    }
+    return '';
+  }, [params.vehicleId]);
 
   const [vehicle, setVehicle] = useState<VehicleRecord | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
