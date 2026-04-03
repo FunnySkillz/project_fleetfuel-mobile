@@ -1,17 +1,18 @@
 import type * as SQLite from 'expo-sqlite';
 
-import { getDatabase, runInWriteTransaction } from '@/data/db';
+import { getDatabase } from '@/data/db';
 import { nowIso } from '@/data/db-utils';
 import type { EntryDetail, FuelEntryDetail, TripPrivateTag } from '@/data/types';
-import { emitDataChange } from '@/services/data-change-events';
 
+import type { MutationAuditContext } from './change-history-repo';
+import { fuelRepo } from './fuel-repo';
 import {
   resolveEffectiveCurrentOdometer as resolveEffectiveCurrentOdometerQuery,
   resolveLatestEntryOdometer as resolveLatestEntryOdometerQuery,
-  syncVehicleCurrentOdometerTx,
   type EffectiveCurrentOdometer,
   type LatestEntryOdometer,
 } from './odometer-resolver';
+import { tripsRepo } from './trips-repo';
 import { assertRequiredPrivateTag, normalizeOptionalText } from './shared';
 
 const NOTES_MAX = 500;
@@ -40,6 +41,7 @@ type FuelDetailRow = {
   occurred_at: string;
   fuel_type: FuelEntryDetail['fuelType'];
   liters: number;
+  fuel_in_tank_after_refuel_liters: number | null;
   total_price: number;
   station: string;
   odometer_km: number | null;
@@ -79,6 +81,7 @@ function mapFuelDetail(row: FuelDetailRow): EntryDetail {
     occurredAt: row.occurred_at,
     fuelType: row.fuel_type,
     liters: row.liters,
+    fuelInTankAfterRefuelLiters: row.fuel_in_tank_after_refuel_liters,
     totalPrice: row.total_price,
     station: row.station,
     odometerKm: row.odometer_km,
@@ -129,6 +132,7 @@ async function getFuelDetailById(db: SQLite.SQLiteDatabase, id: string) {
         f.occurred_at,
         f.fuel_type,
         f.liters,
+        f.fuel_in_tank_after_refuel_liters,
         f.total_price,
         f.station,
         f.odometer_km,
@@ -208,145 +212,104 @@ export const entriesRepo = {
       notes?: string | null;
       privateTag?: TripPrivateTag;
     },
+    audit: MutationAuditContext,
   ): Promise<EntryDetail> {
+    const db = await getDatabase();
     const notes = patch.notes === undefined ? undefined : normalizeNotes(patch.notes);
 
-    await runInWriteTransaction(async (txn) => {
-      const timestamp = nowIso();
+    const trip = await db.getFirstAsync<{ id: string; private_tag: TripPrivateTag; notes: string | null }>(
+      `
+        SELECT id, private_tag, notes
+        FROM trips
+        WHERE id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [id],
+    );
 
-      const trip = await txn.getFirstAsync<{ id: string; private_tag: TripPrivateTag; notes: string | null }>(
-        `
-          SELECT id, private_tag, notes
-          FROM trips
-          WHERE id = ?
-            AND deleted_at IS NULL
-          LIMIT 1
-        `,
-        [id],
+    if (trip) {
+      const nextPrivateTag = assertRequiredPrivateTag(patch.privateTag === undefined ? trip.private_tag : patch.privateTag);
+      await tripsRepo.update(
+        id,
+        {
+          notes: notes === undefined ? trip.notes : notes,
+          privateTag: nextPrivateTag,
+        },
+        audit,
       );
-
-      if (trip) {
-        const nextNotes = notes === undefined ? trip.notes : notes;
-        const nextPrivateTag = assertRequiredPrivateTag(patch.privateTag === undefined ? trip.private_tag : patch.privateTag);
-
-        await txn.runAsync(
-          `
-            UPDATE trips
-            SET notes = ?,
-                private_tag = ?,
-                updated_at = ?
-            WHERE id = ?
-              AND deleted_at IS NULL
-          `,
-          [nextNotes, nextPrivateTag, timestamp, id],
-        );
-        return;
+      const updated = await this.getById(id);
+      if (!updated) {
+        throw new Error('Entry not found after update.');
       }
+      return updated;
+    }
 
-      const fuel = await txn.getFirstAsync<{ id: string; notes: string | null }>(
-        `
-          SELECT id, notes
-          FROM fuel_entries
-          WHERE id = ?
-            AND deleted_at IS NULL
-          LIMIT 1
-        `,
-        [id],
-      );
+    const fuel = await db.getFirstAsync<{ id: string; notes: string | null }>(
+      `
+        SELECT id, notes
+        FROM fuel_entries
+        WHERE id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [id],
+    );
 
-      if (!fuel) {
-        throw new Error('Entry not found.');
-      }
+    if (!fuel) {
+      throw new Error('Entry not found.');
+    }
 
-      const nextNotes = notes === undefined ? fuel.notes : notes;
-      await txn.runAsync(
-        `
-          UPDATE fuel_entries
-          SET notes = ?,
-              updated_at = ?
-          WHERE id = ?
-            AND deleted_at IS NULL
-        `,
-        [nextNotes, timestamp, id],
-      );
-    });
+    await fuelRepo.update(
+      id,
+      {
+        notes: notes === undefined ? fuel.notes : notes,
+      },
+      audit,
+    );
 
     const updated = await this.getById(id);
     if (!updated) {
       throw new Error('Entry not found after update.');
     }
-
-    emitDataChange({ scope: 'entries', action: 'update' });
     return updated;
   },
 
-  async delete(id: string): Promise<void> {
-    await runInWriteTransaction(async (txn) => {
-      const timestamp = nowIso();
-      const trip = await txn.getFirstAsync<{ id: string; vehicle_id: string }>(
-        `
-          SELECT id, vehicle_id
-          FROM trips
-          WHERE id = ?
-            AND deleted_at IS NULL
-          LIMIT 1
-        `,
-        [id],
-      );
+  async delete(id: string, audit: MutationAuditContext): Promise<void> {
+    const db = await getDatabase();
+    const trip = await db.getFirstAsync<{ id: string }>(
+      `
+        SELECT id
+        FROM trips
+        WHERE id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [id],
+    );
 
-      if (trip) {
-        const tripDelete = await txn.runAsync(
-          `
-            UPDATE trips
-            SET deleted_at = ?,
-                updated_at = ?
-            WHERE id = ?
-              AND deleted_at IS NULL
-          `,
-          [timestamp, timestamp, id],
-        );
+    if (trip) {
+      await tripsRepo.delete(id, audit);
+      return;
+    }
 
-        if ((tripDelete.changes ?? 0) === 0) {
-          throw new Error('Entry not found.');
-        }
+    const fuel = await db.getFirstAsync<{ id: string }>(
+      `
+        SELECT id
+        FROM fuel_entries
+        WHERE id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [id],
+    );
 
-        await syncVehicleCurrentOdometerTx(txn, trip.vehicle_id);
-        return;
-      }
+    if (fuel) {
+      await fuelRepo.delete(id, audit);
+      return;
+    }
 
-      const fuel = await txn.getFirstAsync<{ id: string; vehicle_id: string }>(
-        `
-          SELECT id, vehicle_id
-          FROM fuel_entries
-          WHERE id = ?
-            AND deleted_at IS NULL
-          LIMIT 1
-        `,
-        [id],
-      );
-
-      if (!fuel) {
-        throw new Error('Entry not found.');
-      }
-
-      const fuelDelete = await txn.runAsync(
-        `
-          UPDATE fuel_entries
-          SET deleted_at = ?,
-              updated_at = ?
-          WHERE id = ?
-            AND deleted_at IS NULL
-        `,
-        [timestamp, timestamp, id],
-      );
-
-      if ((fuelDelete.changes ?? 0) === 0) {
-        throw new Error('Entry not found.');
-      }
-
-      await syncVehicleCurrentOdometerTx(txn, fuel.vehicle_id);
-    });
-    emitDataChange({ scope: 'entries', action: 'delete' });
+    throw new Error('Entry not found.');
   },
 
   async countMonthly(referenceIso: string = nowIso()): Promise<{ trips: number; fuelEntries: number }> {
