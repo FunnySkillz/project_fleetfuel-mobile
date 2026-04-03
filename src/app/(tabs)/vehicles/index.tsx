@@ -77,9 +77,10 @@ export default function VehiclesScreen() {
   }, [isFocused, loadVehicles, query]);
 
   useEffect(() => {
+    const swipeableMap = swipeableRefs.current;
     return () => {
-      swipeableRefs.current.forEach((swipeable) => swipeable.close());
-      swipeableRefs.current.clear();
+      swipeableMap.forEach((swipeable) => swipeable.close());
+      swipeableMap.clear();
       openSwipeableIdRef.current = null;
     };
   }, []);
