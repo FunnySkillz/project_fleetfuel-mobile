@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ReasonRequiredModal } from '@/components/reason-required-modal';
 import { ThemedView } from '@/components/themed-view';
 import { ActionIcon, AppText, Button, Card, EmptyState, ListRow, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -70,12 +71,21 @@ export default function VehicleDetailScreen() {
   const { t } = useI18n();
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ vehicleId?: string | string[] }>();
-  const vehicleId = typeof params.vehicleId === 'string' ? params.vehicleId.trim() : '';
+  const vehicleId = useMemo(() => {
+    if (typeof params.vehicleId === 'string') {
+      return params.vehicleId.trim();
+    }
+    if (Array.isArray(params.vehicleId)) {
+      return params.vehicleId.map((entry) => entry.trim()).find((entry) => entry.length > 0) ?? '';
+    }
+    return '';
+  }, [params.vehicleId]);
 
   const [summary, setSummary] = useState<VehicleInsightSummary | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [reasonModalVisible, setReasonModalVisible] = useState(false);
 
   const loadVehicleInsight = useCallback(async () => {
     if (!vehicleId) {
@@ -138,17 +148,7 @@ export default function VehicleDetailScreen() {
           text: t('vehicleDetail.deleteAction'),
           style: 'destructive',
           onPress: () => {
-            void (async () => {
-              setDeleting(true);
-              try {
-                await vehiclesRepo.delete(summary.vehicle.id);
-                router.replace('/vehicles');
-              } catch (error) {
-                Alert.alert(t('vehicleDetail.deleteFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
-              } finally {
-                setDeleting(false);
-              }
-            })();
+            setReasonModalVisible(true);
           },
         },
       ],
@@ -323,6 +323,16 @@ export default function VehicleDetailScreen() {
                     })
                   }
                 />
+                <Button
+                  label={t('vehicleDetail.historyAction')}
+                  variant="secondary"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/vehicles/[vehicleId]/history',
+                      params: { vehicleId: summary.vehicle.id },
+                    })
+                  }
+                />
               </Card>
 
               <Card className="gap-2">
@@ -363,6 +373,37 @@ export default function VehicleDetailScreen() {
             </>
           )}
         </ScrollView>
+        <ReasonRequiredModal
+          visible={reasonModalVisible}
+          title={t('audit.reason.vehicleDeleteTitle')}
+          description={t('audit.reason.vehicleDeleteDescription')}
+          confirmLabel={t('audit.reason.deleteAction')}
+          submitting={deleting}
+          onCancel={() => {
+            if (deleting) {
+              return;
+            }
+            setReasonModalVisible(false);
+          }}
+          onConfirm={(reason) => {
+            if (!summary || deleting) {
+              return;
+            }
+
+            void (async () => {
+              setDeleting(true);
+              try {
+                await vehiclesRepo.delete(summary.vehicle.id, { reason });
+                setReasonModalVisible(false);
+                router.replace('/vehicles');
+              } catch (error) {
+                Alert.alert(t('vehicleDetail.deleteFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
+              } finally {
+                setDeleting(false);
+              }
+            })();
+          }}
+        />
       </SafeAreaView>
     </ThemedView>
   );
