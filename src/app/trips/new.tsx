@@ -1,7 +1,8 @@
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet, View, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
@@ -54,6 +55,7 @@ function currentLocalTimeHHMM(date: Date = new Date()) {
 export default function AddTripScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const isFocused = useIsFocused();
   const { t } = useI18n();
   const params = useLocalSearchParams<{ vehicleId?: string | string[] }>();
@@ -84,6 +86,8 @@ export default function AddTripScreen() {
   const [notes, setNotes] = useState('');
   const [privateTag, setPrivateTag] = useState<TripPrivateTag>(null);
   const startOdometerEditedRef = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const notesFieldYRef = useRef(0);
 
   const [saving, setSaving] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -382,21 +386,33 @@ export default function AddTripScreen() {
   };
 
   const hasVehicles = vehicles.length > 0;
+  const scrollToNotes = () => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, notesFieldYRef.current - Spacing.two),
+      animated: true,
+    });
+  };
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <ScrollView
-          contentInsetAdjustmentBehavior="never"
-          automaticallyAdjustContentInsets={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}> 
-          <SectionHeader
-            title={t('tripForm.title')}
-            description={t('tripForm.description')}
-          />
+        <KeyboardAvoidingView
+          style={styles.safeArea}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}>
+          <ScrollView
+            ref={scrollRef}
+            contentInsetAdjustmentBehavior="never"
+            automaticallyAdjustContentInsets={false}
+            automaticallyAdjustKeyboardInsets
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.five }]}> 
+            <SectionHeader
+              title={t('tripForm.title')}
+              description={t('tripForm.description')}
+            />
 
-          <Card className="gap-3">
+            <Card className="gap-3">
             <FormField
               label={t('tripForm.vehicleLabel')}
               required
@@ -574,32 +590,41 @@ export default function AddTripScreen() {
               />
             </FormField>
 
-            <FormField
-              label={t('tripForm.field.notes')}
-              hint={t('common.charCount', { current: trimmedLength(notes), max: NOTES_MAX })}
-              error={showError('notes') ? errors.notes : null}>
-              <TextArea
-                value={notes}
-                onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
-                onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
-                placeholder={t('tripForm.placeholder.notes')}
-                autoCapitalize="sentences"
-                maxLength={NOTES_MAX}
-                tone={showError('notes') ? 'destructive' : 'neutral'}
-              />
-            </FormField>
-          </Card>
+              <FormField
+                onLayout={(event) => {
+                  notesFieldYRef.current = event.nativeEvent.layout.y;
+                }}
+                label={t('tripForm.field.notes')}
+                hint={t('common.charCount', { current: trimmedLength(notes), max: NOTES_MAX })}
+                error={showError('notes') ? errors.notes : null}>
+                <TextArea
+                  value={notes}
+                  onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
+                  onFocus={() => {
+                    requestAnimationFrame(() => {
+                      scrollToNotes();
+                    });
+                  }}
+                  onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
+                  placeholder={t('tripForm.placeholder.notes')}
+                  autoCapitalize="sentences"
+                  maxLength={NOTES_MAX}
+                  tone={showError('notes') ? 'destructive' : 'neutral'}
+                />
+              </FormField>
+            </Card>
 
-          <Button
-            label={t('tripForm.save')}
-            loading={saving}
-            loadingLabel={t('tripForm.saving')}
-            variant="primary"
-            disabled={!canSubmit}
-            leftIcon={({ color, size }) => <ActionIcon name="save" color={color} size={size} />}
-            onPress={() => void handleSave()}
-          />
-        </ScrollView>
+            <Button
+              label={t('tripForm.save')}
+              loading={saving}
+              loadingLabel={t('tripForm.saving')}
+              variant="primary"
+              disabled={!canSubmit}
+              leftIcon={({ color, size }) => <ActionIcon name="save" color={color} size={size} />}
+              onPress={() => void handleSave()}
+            />
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
   );
