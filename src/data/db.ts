@@ -188,6 +188,30 @@ async function migrateToV7(db: SQLite.SQLiteDatabase) {
   `);
 }
 
+async function migrateToV8(db: SQLite.SQLiteDatabase) {
+  await db.execAsync(`
+    DROP TRIGGER IF EXISTS trg_fuel_entries_require_tank_after_insert;
+    DROP TRIGGER IF EXISTS trg_fuel_entries_require_tank_after_update;
+
+    CREATE TRIGGER IF NOT EXISTS trg_fuel_entries_require_tank_after_insert
+    BEFORE INSERT ON fuel_entries
+    FOR EACH ROW
+    WHEN NEW.fuel_in_tank_after_refuel_liters IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'Fuel in tank after refuel liters is required.');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_fuel_entries_require_tank_after_update
+    BEFORE UPDATE ON fuel_entries
+    FOR EACH ROW
+    WHEN NEW.deleted_at IS NULL
+      AND NEW.fuel_in_tank_after_refuel_liters IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'Fuel in tank after refuel liters is required.');
+    END;
+  `);
+}
+
 async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL;');
   await db.execAsync('PRAGMA foreign_keys = ON;');
@@ -215,6 +239,9 @@ async function initializeDatabase(db: SQLite.SQLiteDatabase) {
   }
   if (currentVersion < 7) {
     await migrateToV7(db);
+  }
+  if (currentVersion < 8) {
+    await migrateToV8(db);
   }
 
   if (currentVersion !== SCHEMA_VERSION) {
