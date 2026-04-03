@@ -137,7 +137,7 @@ function renderTripTableRows(trips: ExportTripRow[]) {
 
 function renderFuelTableRows(fuelEntries: ExportFuelRow[]) {
   if (fuelEntries.length === 0) {
-    return '<tr><td colspan="5" class="muted">No matching fuel entries.</td></tr>';
+    return '<tr><td colspan="7" class="muted">No matching fuel entries.</td></tr>';
   }
 
   return fuelEntries
@@ -148,6 +148,7 @@ function renderFuelTableRows(fuelEntries: ExportFuelRow[]) {
         <td>${escapeHtml(fuelTypeLabel(fuel.fuelType))}</td>
         <td>${escapeHtml(fuel.station)}</td>
         <td>${fuel.liters.toFixed(2)} L</td>
+        <td>${fuel.fuelInTankAfterRefuelLiters !== null ? `${fuel.fuelInTankAfterRefuelLiters.toFixed(2)} L` : '-'}</td>
         <td>${escapeHtml(formatCurrency(fuel.totalPrice))}</td>
         <td>${fuel.odometerKm ?? '-'}</td>
       </tr>
@@ -198,6 +199,7 @@ function renderVehicleSection(section: ExportVehicleSection, includeFuel: boolea
             <th>Fuel type</th>
             <th>Station</th>
             <th>Liters</th>
+            <th>Tank level</th>
             <th>Total</th>
             <th>Odometer</th>
           </tr>
