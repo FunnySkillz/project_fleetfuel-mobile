@@ -27,6 +27,9 @@ import { copyReceiptToAppStorage } from '@/utils/receipt-files';
 const LITERS_INTEGER_DIGITS = 3;
 const LITERS_FRACTION_DIGITS = 2;
 const LITERS_MAX = 500;
+const FUEL_IN_TANK_INTEGER_DIGITS = 4;
+const FUEL_IN_TANK_FRACTION_DIGITS = 2;
+const FUEL_IN_TANK_MAX = 2000;
 const PRICE_INTEGER_DIGITS = 6;
 const PRICE_FRACTION_DIGITS = 2;
 const PRICE_MAX = 500000;
@@ -39,6 +42,7 @@ type FuelFormErrors = {
   vehicleId?: string;
   fuelType?: string;
   liters?: string;
+  fuelInTankAfterRefuel?: string;
   price?: string;
   station?: string;
   odometer?: string;
@@ -89,6 +93,7 @@ export default function AddFuelEntryScreen() {
   const [previousFuelKm, setPreviousFuelKm] = useState<number | null>(null);
 
   const [liters, setLiters] = useState('');
+  const [fuelInTankAfterRefuel, setFuelInTankAfterRefuel] = useState('');
   const [price, setPrice] = useState('');
   const [station, setStation] = useState('');
   const [odometer, setOdometer] = useState('');
@@ -104,6 +109,7 @@ export default function AddFuelEntryScreen() {
     vehicleId: false,
     fuelType: false,
     liters: false,
+    fuelInTankAfterRefuel: false,
     price: false,
     station: false,
     odometer: false,
@@ -232,6 +238,7 @@ export default function AddFuelEntryScreen() {
   }, [selectedVehicleId, vehicles]);
 
   const litersValue = parseDecimalValue(liters);
+  const fuelInTankAfterRefuelValue = parseDecimalValue(fuelInTankAfterRefuel);
   const priceValue = parseDecimalValue(price);
   const odometerValue = parseIntegerValue(odometer);
   const avgConsumptionPreview = calculateAvgConsumption(litersValue, odometerValue, previousFuelKm);
@@ -241,13 +248,14 @@ export default function AddFuelEntryScreen() {
     () =>
       fuelType !== null ||
       liters.trim().length > 0 ||
+      fuelInTankAfterRefuel.trim().length > 0 ||
       price.trim().length > 0 ||
       station.trim().length > 0 ||
       notes.trim().length > 0 ||
       receipt !== null ||
       saving ||
       attachmentBusy,
-    [attachmentBusy, fuelType, liters, notes, price, receipt, saving, station],
+    [attachmentBusy, fuelInTankAfterRefuel, fuelType, liters, notes, price, receipt, saving, station],
   );
   const { allowNextNavigation } = useUnsavedChangesGuard(isDirty);
 
@@ -270,6 +278,16 @@ export default function AddFuelEntryScreen() {
       result.liters = t('fuelForm.error.litersPositive');
     } else if (litersValue > LITERS_MAX) {
       result.liters = t('fuelForm.error.litersMax', { max: LITERS_MAX });
+    }
+
+    if (fuelInTankAfterRefuel.trim().length === 0) {
+      result.fuelInTankAfterRefuel = t('fuelForm.error.fuelInTankAfterRefuelRequired');
+    } else if (fuelInTankAfterRefuelValue === null) {
+      result.fuelInTankAfterRefuel = t('fuelForm.error.fuelInTankAfterRefuelNumber');
+    } else if (fuelInTankAfterRefuelValue < 0) {
+      result.fuelInTankAfterRefuel = t('fuelForm.error.fuelInTankAfterRefuelNonNegative');
+    } else if (fuelInTankAfterRefuelValue > FUEL_IN_TANK_MAX) {
+      result.fuelInTankAfterRefuel = t('fuelForm.error.fuelInTankAfterRefuelMax', { max: FUEL_IN_TANK_MAX });
     }
 
     if (price.trim().length === 0) {
@@ -308,12 +326,29 @@ export default function AddFuelEntryScreen() {
     }
 
     return result;
-  }, [fuelType, latestRecordedKm, liters, litersValue, notes, odometer, odometerValue, price, priceValue, receipt, selectedVehicleId, station, t]);
+  }, [
+    fuelInTankAfterRefuel,
+    fuelInTankAfterRefuelValue,
+    fuelType,
+    latestRecordedKm,
+    liters,
+    litersValue,
+    notes,
+    odometer,
+    odometerValue,
+    price,
+    priceValue,
+    receipt,
+    selectedVehicleId,
+    station,
+    t,
+  ]);
 
   const isValid =
     !errors.vehicleId &&
     !errors.fuelType &&
     !errors.liters &&
+    !errors.fuelInTankAfterRefuel &&
     !errors.price &&
     !errors.station &&
     !errors.odometer &&
@@ -333,6 +368,7 @@ export default function AddFuelEntryScreen() {
       vehicleId: true,
       fuelType: true,
       liters: true,
+      fuelInTankAfterRefuel: true,
       price: true,
       station: true,
       odometer: true,
@@ -340,7 +376,13 @@ export default function AddFuelEntryScreen() {
       receipt: true,
     });
 
-    if (!isValid || litersValue === null || priceValue === null || odometerValue === null) {
+    if (
+      !isValid ||
+      litersValue === null ||
+      fuelInTankAfterRefuelValue === null ||
+      priceValue === null ||
+      odometerValue === null
+    ) {
       Alert.alert(t('common.checkFormTitle'), t('common.fixValidationErrors'));
       return;
     }
@@ -351,6 +393,7 @@ export default function AddFuelEntryScreen() {
         vehicleId: selectedVehicleId,
         fuelType,
         liters: litersValue,
+        fuelInTankAfterRefuelLiters: fuelInTankAfterRefuelValue,
         totalPrice: priceValue,
         station: normalizeText(station),
         odometerKm: odometerValue,
@@ -581,6 +624,24 @@ export default function AddFuelEntryScreen() {
                 keyboardType="decimal-pad"
                 placeholder={t('fuelForm.placeholder.liters')}
                 tone={showError('liters') ? 'destructive' : 'neutral'}
+              />
+            </FormField>
+
+            <FormField
+              label={t('fuelForm.field.fuelInTankAfterRefuel')}
+              required
+              error={showError('fuelInTankAfterRefuel') ? errors.fuelInTankAfterRefuel : null}>
+              <Input
+                value={fuelInTankAfterRefuel}
+                onChangeText={(value) =>
+                  setFuelInTankAfterRefuel(
+                    sanitizeDecimalInput(value, FUEL_IN_TANK_INTEGER_DIGITS, FUEL_IN_TANK_FRACTION_DIGITS),
+                  )
+                }
+                onBlur={() => setTouched((prev) => ({ ...prev, fuelInTankAfterRefuel: true }))}
+                keyboardType="decimal-pad"
+                placeholder={t('fuelForm.placeholder.fuelInTankAfterRefuel')}
+                tone={showError('fuelInTankAfterRefuel') ? 'destructive' : 'neutral'}
               />
             </FormField>
 
