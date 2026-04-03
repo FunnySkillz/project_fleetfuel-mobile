@@ -14,6 +14,7 @@ import type {
 } from '@/data/types';
 import { emitDataChange } from '@/services/data-change-events';
 
+import { changeHistoryRepo, type MutationAuditContext } from './change-history-repo';
 import {
   assertValidFuelType,
   normalizeOptionalInteger,
@@ -601,12 +602,13 @@ export const vehiclesRepo = {
     return created;
   },
 
-  async update(id: string, input: VehicleWriteInput): Promise<VehicleRecord> {
+  async update(id: string, input: VehicleWriteInput, audit: MutationAuditContext): Promise<VehicleRecord> {
     const updated = await runInWriteTransaction(async (txn) => {
       const current = await getVehicleRowById(txn, id);
       if (!current) {
         throw new Error('Vehicle not found.');
       }
+      const beforeSnapshot = mapVehicleRecord(current);
 
       const normalized = normalizeVehicleInput(input);
       const timestamp = nowIso();
@@ -651,19 +653,57 @@ export const vehiclesRepo = {
         ],
       );
 
-      return {
+      const updatedRecord: VehicleRecord = {
         id,
         ...normalized,
         createdAt: current.created_at,
         updatedAt: timestamp,
       };
+
+      await changeHistoryRepo.recordUpdateTx(txn, {
+        vehicleId: id,
+        entityType: 'vehicle',
+        entityId: id,
+        audit,
+        before: beforeSnapshot as unknown as Record<string, unknown>,
+        after: updatedRecord as unknown as Record<string, unknown>,
+        occurredAt: timestamp,
+      });
+
+      return updatedRecord;
     });
     emitDataChange({ scope: 'vehicles', action: 'update' });
     return updated;
   },
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, audit: MutationAuditContext): Promise<void> {
     await runInWriteTransaction(async (txn) => {
+      const current = await getVehicleRowById(txn, id);
+      if (!current) {
+        throw new Error('Vehicle not found.');
+      }
+      const beforeSnapshot = mapVehicleRecord(current);
+      const [tripCountRow, fuelCountRow] = await Promise.all([
+        txn.getFirstAsync<{ total: number }>(
+          `
+            SELECT COUNT(1) AS total
+            FROM trips
+            WHERE vehicle_id = ?
+              AND deleted_at IS NULL
+          `,
+          [id],
+        ),
+        txn.getFirstAsync<{ total: number }>(
+          `
+            SELECT COUNT(1) AS total
+            FROM fuel_entries
+            WHERE vehicle_id = ?
+              AND deleted_at IS NULL
+          `,
+          [id],
+        ),
+      ]);
+
       const timestamp = nowIso();
       const vehicleDeleteResult = await txn.runAsync(
         `
@@ -701,6 +741,19 @@ export const vehiclesRepo = {
         `,
         [timestamp, timestamp, id],
       );
+
+      await changeHistoryRepo.recordDeleteTx(txn, {
+        vehicleId: id,
+        entityType: 'vehicle',
+        entityId: id,
+        audit,
+        before: beforeSnapshot as unknown as Record<string, unknown>,
+        metadata: {
+          cascadedTrips: tripCountRow?.total ?? 0,
+          cascadedFuelEntries: fuelCountRow?.total ?? 0,
+        },
+        occurredAt: timestamp,
+      });
     });
     emitDataChange({ scope: 'vehicles', action: 'delete' });
     emitDataChange({ scope: 'entries', action: 'delete' });
