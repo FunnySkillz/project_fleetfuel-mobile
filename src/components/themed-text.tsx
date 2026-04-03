@@ -33,41 +33,41 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 
 const styles = StyleSheet.create({
   small: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: 500,
   },
   smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: 700,
   },
   default: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 17,
+    lineHeight: 25,
     fontWeight: 500,
   },
   title: {
-    fontSize: 48,
+    fontSize: 49,
     fontWeight: 600,
-    lineHeight: 52,
+    lineHeight: 53,
   },
   subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
+    fontSize: 33,
+    lineHeight: 45,
     fontWeight: 600,
   },
   link: {
-    lineHeight: 30,
-    fontSize: 14,
+    lineHeight: 31,
+    fontSize: 15,
   },
   linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
+    lineHeight: 31,
+    fontSize: 15,
   },
   code: {
     fontFamily: Fonts.mono,
     fontWeight: Platform.select({ android: 700 }) ?? 500,
-    fontSize: 12,
+    fontSize: 13,
   },
 });
