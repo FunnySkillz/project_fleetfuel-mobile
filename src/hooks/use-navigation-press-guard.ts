@@ -18,8 +18,9 @@ export function useNavigationPressGuard(options: UseNavigationPressGuardOptions 
   }, [isFocused]);
 
   useEffect(() => {
+    const guard = guardRef.current;
     return () => {
-      guardRef.current.dispose();
+      guard.dispose();
     };
   }, []);
 
@@ -41,4 +42,3 @@ export function useNavigationPressGuard(options: UseNavigationPressGuardOptions 
     isLocked,
   };
 }
-
