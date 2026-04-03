@@ -2,7 +2,7 @@ import { useIsFocused } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -91,6 +91,7 @@ export default function AddFuelEntryScreen() {
   const [latestRecordedKm, setLatestRecordedKm] = useState<number | null>(null);
   const [odometerSuggestionSource, setOdometerSuggestionSource] = useState<'latestEntry' | 'vehicleBaseline' | null>(null);
   const [previousFuelKm, setPreviousFuelKm] = useState<number | null>(null);
+  const odometerEditedRef = useRef(false);
 
   const [liters, setLiters] = useState('');
   const [fuelInTankAfterRefuel, setFuelInTankAfterRefuel] = useState('');
@@ -99,6 +100,7 @@ export default function AddFuelEntryScreen() {
   const [odometer, setOdometer] = useState('');
   const [fuelType, setFuelType] = useState<FuelType | null>(null);
   const [fuelTypeManuallyEdited, setFuelTypeManuallyEdited] = useState(false);
+  const previousVehicleIdRef = useRef('');
   const [notes, setNotes] = useState('');
   const [receipt, setReceipt] = useState<ReceiptAttachment | null>(null);
 
@@ -169,10 +171,13 @@ export default function AddFuelEntryScreen() {
       setLatestRecordedKm(null);
       setOdometerSuggestionSource(null);
       setPreviousFuelKm(null);
+      odometerEditedRef.current = false;
       setOdometer('');
       return;
     }
 
+    odometerEditedRef.current = false;
+    setOdometer('');
     let cancelled = false;
     void Promise.all([
       entriesRepo.resolveEffectiveCurrentOdometer(selectedVehicleId),
@@ -186,9 +191,9 @@ export default function AddFuelEntryScreen() {
         setLatestRecordedKm(resolvedCurrent.value);
         setOdometerSuggestionSource(resolvedCurrent.source);
         setPreviousFuelKm(previousFuel);
-        if (resolvedCurrent.value !== null) {
+        if (!odometerEditedRef.current && resolvedCurrent.value !== null) {
           setOdometer(String(resolvedCurrent.value));
-        } else {
+        } else if (!odometerEditedRef.current) {
           setOdometer('');
         }
       })
@@ -204,6 +209,15 @@ export default function AddFuelEntryScreen() {
     return () => {
       cancelled = true;
     };
+  }, [selectedVehicleId]);
+
+  useEffect(() => {
+    if (previousVehicleIdRef.current === selectedVehicleId) {
+      return;
+    }
+
+    previousVehicleIdRef.current = selectedVehicleId;
+    setFuelTypeManuallyEdited(false);
   }, [selectedVehicleId]);
 
   useEffect(() => {
@@ -606,12 +620,15 @@ export default function AddFuelEntryScreen() {
                   : t('fuelForm.hint.currentKmNoLatest')
               }
               error={showError('odometer') ? errors.odometer : null}>
-              <Input
-                value={odometer}
-                onChangeText={(value) => setOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
-                onBlur={() => setTouched((prev) => ({ ...prev, odometer: true }))}
-                keyboardType="number-pad"
-                placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : t('fuelForm.placeholder.currentKm')}
+                <Input
+                  value={odometer}
+                  onChangeText={(value) => {
+                    odometerEditedRef.current = true;
+                    setOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS));
+                  }}
+                  onBlur={() => setTouched((prev) => ({ ...prev, odometer: true }))}
+                  keyboardType="number-pad"
+                  placeholder={latestRecordedKm !== null ? String(latestRecordedKm) : t('fuelForm.placeholder.currentKm')}
                 tone={showError('odometer') ? 'destructive' : 'neutral'}
               />
             </FormField>
