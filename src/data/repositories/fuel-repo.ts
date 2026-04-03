@@ -5,10 +5,12 @@ import { createId, nowIso } from '@/data/db-utils';
 import { FUEL_TYPES, type FuelEntryRecord, type FuelType, type ReceiptAttachment } from '@/data/types';
 import { emitDataChange } from '@/services/data-change-events';
 
+import { changeHistoryRepo, type MutationAuditContext } from './change-history-repo';
 import { resolveEffectiveCurrentOdometerTx, syncVehicleCurrentOdometerTx } from './odometer-resolver';
 import { normalizeOptionalText, normalizeRequiredText } from './shared';
 
 const LITERS_MAX = 500;
+const FUEL_IN_TANK_MAX = 2000;
 const PRICE_MAX = 500000;
 const STATION_MIN = 2;
 const STATION_MAX = 80;
@@ -22,6 +24,7 @@ type FuelRow = {
   occurred_at: string;
   fuel_type: FuelType | null;
   liters: number;
+  fuel_in_tank_after_refuel_liters: number | null;
   total_price: number;
   station: string;
   odometer_km: number | null;
@@ -39,6 +42,7 @@ type FuelCreateInput = {
   occurredAt?: string | null;
   fuelType?: FuelType | null;
   liters: number;
+  fuelInTankAfterRefuelLiters: number;
   totalPrice: number;
   station: string;
   odometerKm: number;
@@ -53,6 +57,7 @@ function mapFuelRecord(row: FuelRow): FuelEntryRecord {
     occurredAt: row.occurred_at,
     fuelType: row.fuel_type,
     liters: row.liters,
+    fuelInTankAfterRefuelLiters: row.fuel_in_tank_after_refuel_liters,
     totalPrice: row.total_price,
     station: row.station,
     odometerKm: row.odometer_km,
@@ -91,6 +96,20 @@ function normalizePositiveNumber(value: number, fieldName: string, max: number) 
   }
 
   return value;
+}
+
+function normalizeNonNegativeNumber(value: number, fieldName: string, max: number) {
+  if (!Number.isFinite(value)) {
+    throw new Error(`${fieldName} must be a valid number.`);
+  }
+  if (value < 0) {
+    throw new Error(`${fieldName} must be 0 or greater.`);
+  }
+  if (value > max) {
+    throw new Error(`${fieldName} must be less than or equal to ${max}.`);
+  }
+
+  return Math.round(value * 100) / 100;
 }
 
 function normalizeOdometer(value: number) {
@@ -182,6 +201,7 @@ async function getFuelRowById(db: SQLite.SQLiteDatabase, id: string) {
         occurred_at,
         fuel_type,
         liters,
+        fuel_in_tank_after_refuel_liters,
         total_price,
         station,
         odometer_km,
@@ -243,6 +263,11 @@ function normalizeCreateInput(input: FuelCreateInput) {
     occurredAt: normalizeOccurredAt(input.occurredAt),
     fuelType: normalizeFuelType(input.fuelType),
     liters: normalizePositiveNumber(input.liters, 'Liters', LITERS_MAX),
+    fuelInTankAfterRefuelLiters: normalizeNonNegativeNumber(
+      input.fuelInTankAfterRefuelLiters,
+      'Fuel in tank after refuel liters',
+      FUEL_IN_TANK_MAX,
+    ),
     totalPrice: normalizePositiveNumber(input.totalPrice, 'Total price', PRICE_MAX),
     station: normalizeStation(input.station),
     odometerKm: normalizeOdometer(input.odometerKm),
@@ -262,6 +287,7 @@ export const fuelRepo = {
           occurred_at,
           fuel_type,
           liters,
+          fuel_in_tank_after_refuel_liters,
           total_price,
           station,
           odometer_km,
@@ -318,6 +344,7 @@ export const fuelRepo = {
             occurred_at,
             fuel_type,
             liters,
+            fuel_in_tank_after_refuel_liters,
             total_price,
             station,
             odometer_km,
@@ -330,7 +357,7 @@ export const fuelRepo = {
             updated_at,
             deleted_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         `,
         [
           id,
@@ -338,6 +365,7 @@ export const fuelRepo = {
           normalized.occurredAt,
           normalized.fuelType,
           normalized.liters,
+          normalized.fuelInTankAfterRefuelLiters,
           normalized.totalPrice,
           normalized.station,
           normalized.odometerKm,
@@ -359,6 +387,7 @@ export const fuelRepo = {
         occurredAt: normalized.occurredAt,
         fuelType: normalized.fuelType,
         liters: normalized.liters,
+        fuelInTankAfterRefuelLiters: normalized.fuelInTankAfterRefuelLiters,
         totalPrice: normalized.totalPrice,
         station: normalized.station,
         odometerKm: normalized.odometerKm,
@@ -378,18 +407,22 @@ export const fuelRepo = {
   async update(
     id: string,
     patch: Partial<FuelCreateInput>,
+    audit: MutationAuditContext,
   ): Promise<FuelEntryRecord> {
     const updated = await runInWriteTransaction(async (txn) => {
       const current = await getFuelRowById(txn, id);
       if (!current) {
         throw new Error('Fuel entry not found.');
       }
+      const beforeSnapshot = mapFuelRecord(current);
 
       const normalized = normalizeCreateInput({
         vehicleId: patch.vehicleId ?? current.vehicle_id,
         occurredAt: patch.occurredAt ?? current.occurred_at,
         fuelType: patch.fuelType ?? current.fuel_type,
         liters: patch.liters ?? current.liters,
+        fuelInTankAfterRefuelLiters:
+          patch.fuelInTankAfterRefuelLiters ?? current.fuel_in_tank_after_refuel_liters ?? Number.NaN,
         totalPrice: patch.totalPrice ?? current.total_price,
         station: patch.station ?? current.station,
         odometerKm: patch.odometerKm ?? current.odometer_km ?? 0,
@@ -423,6 +456,7 @@ export const fuelRepo = {
               occurred_at = ?,
               fuel_type = ?,
               liters = ?,
+              fuel_in_tank_after_refuel_liters = ?,
               total_price = ?,
               station = ?,
               odometer_km = ?,
@@ -440,6 +474,7 @@ export const fuelRepo = {
           normalized.occurredAt,
           normalized.fuelType,
           normalized.liters,
+          normalized.fuelInTankAfterRefuelLiters,
           normalized.totalPrice,
           normalized.station,
           normalized.odometerKm,
@@ -458,12 +493,13 @@ export const fuelRepo = {
         await syncVehicleCurrentOdometerTx(txn, current.vehicle_id);
       }
 
-      return {
+      const updatedRecord: FuelEntryRecord = {
         id,
         vehicleId: normalized.vehicleId,
         occurredAt: normalized.occurredAt,
         fuelType: normalized.fuelType,
         liters: normalized.liters,
+        fuelInTankAfterRefuelLiters: normalized.fuelInTankAfterRefuelLiters,
         totalPrice: normalized.totalPrice,
         station: normalized.station,
         odometerKm: normalized.odometerKm,
@@ -475,17 +511,34 @@ export const fuelRepo = {
         createdAt: current.created_at,
         updatedAt: timestamp,
       };
+
+      await changeHistoryRepo.recordUpdateTx(txn, {
+        vehicleId: normalized.vehicleId,
+        entityType: 'fuel',
+        entityId: id,
+        audit,
+        before: beforeSnapshot as unknown as Record<string, unknown>,
+        after: updatedRecord as unknown as Record<string, unknown>,
+        metadata:
+          current.vehicle_id !== normalized.vehicleId
+            ? { previousVehicleId: current.vehicle_id, nextVehicleId: normalized.vehicleId }
+            : null,
+        occurredAt: timestamp,
+      });
+
+      return updatedRecord;
     });
     emitDataChange({ scope: 'entries', action: 'update' });
     return updated;
   },
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, audit: MutationAuditContext): Promise<void> {
     await runInWriteTransaction(async (txn) => {
       const current = await getFuelRowById(txn, id);
       if (!current) {
         throw new Error('Fuel entry not found.');
       }
+      const beforeSnapshot = mapFuelRecord(current);
 
       const timestamp = nowIso();
       const result = await txn.runAsync(
@@ -504,6 +557,14 @@ export const fuelRepo = {
       }
 
       await syncVehicleCurrentOdometerTx(txn, current.vehicle_id);
+      await changeHistoryRepo.recordDeleteTx(txn, {
+        vehicleId: current.vehicle_id,
+        entityType: 'fuel',
+        entityId: id,
+        audit,
+        before: beforeSnapshot as unknown as Record<string, unknown>,
+        occurredAt: timestamp,
+      });
     });
     emitDataChange({ scope: 'entries', action: 'delete' });
   },
