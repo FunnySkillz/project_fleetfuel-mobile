@@ -4,6 +4,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, StyleSheet, View, type AppStateStatus } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AppLockGate } from '@/components/app-lock-gate';
@@ -19,9 +20,11 @@ import { hasPinAsync, verifyPinAsync } from '@/services/pin-auth';
 
 export default function RootLayout() {
   return (
-    <AppPreferencesProvider>
-      <RootNavigator />
-    </AppPreferencesProvider>
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <AppPreferencesProvider>
+        <RootNavigator />
+      </AppPreferencesProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -340,7 +343,7 @@ function RootNavigator() {
             }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="vehicles/new" options={{ title: t('root.addVehicle') }} />
-            <Stack.Screen name="vehicles/[vehicleId]" options={{ title: t('root.vehicleDetail') }} />
+            <Stack.Screen name="vehicles/[vehicleId]/index" options={{ title: t('root.vehicleDetail') }} />
             <Stack.Screen name="vehicles/[vehicleId]/edit" options={{ title: t('root.editVehicle') }} />
             <Stack.Screen name="vehicles/[vehicleId]/history" options={{ title: t('root.vehicleHistory') }} />
             <Stack.Screen name="trips/new" options={{ title: t('root.addTrip') }} />
@@ -417,6 +420,9 @@ function RecoveryGate({ isLoading, error, recovering, onRetry, onRestore }: Reco
 }
 
 const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
   recoveryContainer: {
     flex: 1,
     alignItems: 'center',

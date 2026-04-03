@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react-native';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -47,12 +47,13 @@ export function AccordionSection({
             </AppText>
           ) : null}
         </View>
-        <ChevronDown
-          color={theme.textSecondary}
-          size={18}
-          strokeWidth={2}
-          style={open ? styles.iconOpen : undefined}
-        />
+        <View style={styles.iconWrap}>
+          {open ? (
+            <ChevronUp color={theme.textSecondary} size={18} strokeWidth={2} />
+          ) : (
+            <ChevronDown color={theme.textSecondary} size={18} strokeWidth={2} />
+          )}
+        </View>
       </Pressable>
       {open ? <View className={cn('gap-3', contentClassName)}>{children}</View> : null}
     </Card>
@@ -70,11 +71,14 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  iconOpen: {
-    transform: [{ rotate: '180deg' }],
+  iconWrap: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   pressed: {
     opacity: 0.75,
   },
 });
-
