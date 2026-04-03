@@ -1,5 +1,5 @@
-import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useRef } from 'react';
+import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
 type GuardCopy = {
@@ -13,47 +13,74 @@ const DEFAULT_MESSAGE = 'You have unsaved changes. Leave this screen and discard
 export function useUnsavedChangesGuard(isDirty: boolean, copy: GuardCopy = {}) {
   const navigation = useNavigation();
   const isDialogOpenRef = useRef(false);
-  const allowExitRef = useRef(false);
+  const [allowNextRemove, setAllowNextRemove] = useState(false);
+  const allowResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const title = copy.title ?? DEFAULT_TITLE;
   const message = copy.message ?? DEFAULT_MESSAGE;
 
-  const allowNextNavigation = useCallback(() => {
-    allowExitRef.current = true;
-    setTimeout(() => {
-      allowExitRef.current = false;
-    }, 0);
+  const clearAllowResetTimer = useCallback(() => {
+    if (!allowResetTimerRef.current) {
+      return;
+    }
+    clearTimeout(allowResetTimerRef.current);
+    allowResetTimerRef.current = null;
   }, []);
 
+  const scheduleAllowReset = useCallback(() => {
+    clearAllowResetTimer();
+    allowResetTimerRef.current = setTimeout(() => {
+      setAllowNextRemove(false);
+      allowResetTimerRef.current = null;
+    }, 0);
+  }, [clearAllowResetTimer]);
+
+  const allowNextNavigation = useCallback(() => {
+    setAllowNextRemove(true);
+    scheduleAllowReset();
+  }, [scheduleAllowReset]);
+
+  usePreventRemove(isDirty && !allowNextRemove, ({ data }) => {
+    if (isDialogOpenRef.current) {
+      return;
+    }
+
+    isDialogOpenRef.current = true;
+    Alert.alert(title, message, [
+      {
+        text: 'Stay',
+        style: 'cancel',
+        onPress: () => {
+          isDialogOpenRef.current = false;
+        },
+      },
+      {
+        text: 'Discard',
+        style: 'destructive',
+        onPress: () => {
+          isDialogOpenRef.current = false;
+          setAllowNextRemove(true);
+          navigation.dispatch(data.action);
+          scheduleAllowReset();
+        },
+      },
+    ]);
+  });
+
   useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
-      if (!isDirty || isDialogOpenRef.current || allowExitRef.current) {
-        return;
-      }
+    return () => {
+      clearAllowResetTimer();
+      isDialogOpenRef.current = false;
+    };
+  }, [clearAllowResetTimer]);
 
-      event.preventDefault();
-      isDialogOpenRef.current = true;
-
-      Alert.alert(title, message, [
-        {
-          text: 'Stay',
-          style: 'cancel',
-          onPress: () => {
-            isDialogOpenRef.current = false;
-          },
-        },
-        {
-          text: 'Discard',
-          style: 'destructive',
-          onPress: () => {
-            isDialogOpenRef.current = false;
-            navigation.dispatch(event.data.action);
-          },
-        },
-      ]);
-    });
-
-    return unsubscribe;
-  }, [isDirty, message, navigation, title]);
+  useEffect(() => {
+    if (!isDirty) {
+      clearAllowResetTimer();
+      setAllowNextRemove(false);
+      isDialogOpenRef.current = false;
+      return;
+    }
+  }, [clearAllowResetTimer, isDirty]);
 
   return { allowNextNavigation };
 }
