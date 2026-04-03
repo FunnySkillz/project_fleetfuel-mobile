@@ -11,6 +11,7 @@ import { Spacing } from '@/constants/theme';
 import { vehiclesRepo } from '@/data/repositories';
 import type { VehicleInsightSummary, VehicleUsageSplitPoint } from '@/data/types';
 import { useI18n } from '@/hooks/use-i18n';
+import { useNavigationPressGuard } from '@/hooks/use-navigation-press-guard';
 import { useTheme } from '@/hooks/use-theme';
 
 function formatDate(iso: string) {
@@ -69,6 +70,7 @@ export default function VehicleDetailScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { t } = useI18n();
+  const { runGuarded } = useNavigationPressGuard();
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ vehicleId?: string | string[] }>();
   const vehicleId = useMemo(() => {
@@ -352,9 +354,11 @@ export default function VehicleDetailScreen() {
                       })} | ${trip.distanceKm} km | ${trip.startLocation ?? t('common.notAvailable')} -> ${trip.endLocation ?? t('common.notAvailable')}`}
                       meta={formatDate(trip.occurredAt)}
                       onPress={() =>
-                        router.push({
-                          pathname: '/entries/[entryId]',
-                          params: { entryId: trip.id },
+                        runGuarded(() => {
+                          router.push({
+                            pathname: '/entries/[entryId]',
+                            params: { entryId: trip.id },
+                          });
                         })
                       }
                     />
