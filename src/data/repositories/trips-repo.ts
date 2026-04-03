@@ -5,6 +5,7 @@ import { createId, nowIso } from '@/data/db-utils';
 import type { TripPrivateTag, TripRecord } from '@/data/types';
 import { emitDataChange } from '@/services/data-change-events';
 
+import { changeHistoryRepo, type MutationAuditContext } from './change-history-repo';
 import {
   resolveEffectiveCurrentOdometerTx,
   resolveLatestEntryOdometerTx,
@@ -328,12 +329,14 @@ export const tripsRepo = {
   async update(
     id: string,
     patch: Partial<TripCreateInput>,
+    audit: MutationAuditContext,
   ): Promise<TripRecord> {
     const updated = await runInWriteTransaction(async (txn) => {
       const current = await getTripRowById(txn, id);
       if (!current) {
         throw new Error('Trip not found.');
       }
+      const beforeSnapshot = mapTripRecord(current);
 
       const normalized = normalizeTripCreateInput({
         vehicleId: patch.vehicleId ?? current.vehicle_id,
@@ -402,23 +405,40 @@ export const tripsRepo = {
         await syncVehicleCurrentOdometerTx(txn, current.vehicle_id);
       }
 
-      return {
+      const updatedRecord: TripRecord = {
         id,
         ...normalized,
         createdAt: current.created_at,
         updatedAt: timestamp,
       };
+
+      await changeHistoryRepo.recordUpdateTx(txn, {
+        vehicleId: normalized.vehicleId,
+        entityType: 'trip',
+        entityId: id,
+        audit,
+        before: beforeSnapshot as unknown as Record<string, unknown>,
+        after: updatedRecord as unknown as Record<string, unknown>,
+        metadata:
+          current.vehicle_id !== normalized.vehicleId
+            ? { previousVehicleId: current.vehicle_id, nextVehicleId: normalized.vehicleId }
+            : null,
+        occurredAt: timestamp,
+      });
+
+      return updatedRecord;
     });
     emitDataChange({ scope: 'entries', action: 'update' });
     return updated;
   },
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, audit: MutationAuditContext): Promise<void> {
     await runInWriteTransaction(async (txn) => {
       const current = await getTripRowById(txn, id);
       if (!current) {
         throw new Error('Trip not found.');
       }
+      const beforeSnapshot = mapTripRecord(current);
 
       const timestamp = nowIso();
       const result = await txn.runAsync(
@@ -437,6 +457,14 @@ export const tripsRepo = {
       }
 
       await syncVehicleCurrentOdometerTx(txn, current.vehicle_id);
+      await changeHistoryRepo.recordDeleteTx(txn, {
+        vehicleId: current.vehicle_id,
+        entityType: 'trip',
+        entityId: id,
+        audit,
+        before: beforeSnapshot as unknown as Record<string, unknown>,
+        occurredAt: timestamp,
+      });
     });
     emitDataChange({ scope: 'entries', action: 'delete' });
   },
