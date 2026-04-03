@@ -333,7 +333,11 @@ function RootNavigator() {
             }}
           />
         ) : (
-          <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
+          <Stack
+            screenOptions={{
+              headerBackButtonDisplayMode: 'minimal',
+              headerBackButtonMenuEnabled: false,
+            }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="vehicles/new" options={{ title: t('root.addVehicle') }} />
             <Stack.Screen name="vehicles/[vehicleId]" options={{ title: t('root.vehicleDetail') }} />
