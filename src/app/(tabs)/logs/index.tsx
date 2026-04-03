@@ -22,6 +22,7 @@ import { Spacing } from '@/constants/theme';
 import { logsRepo, vehiclesRepo } from '@/data/repositories';
 import type { EntrySummary, ExportPreview, FuelTypeFilter, LogsExportFilters, TripUsageFilter, VehicleListItem } from '@/data/types';
 import { useI18n } from '@/hooks/use-i18n';
+import { useNavigationPressGuard } from '@/hooks/use-navigation-press-guard';
 import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { generateLogsPdf } from '@/services/export/generate-logs-pdf';
@@ -71,6 +72,7 @@ export default function LogsScreen() {
   const isFocused = useIsFocused();
   const theme = useTheme();
   const { t } = useI18n();
+  const { runGuarded } = useNavigationPressGuard();
 
   const now = useMemo(() => new Date(), []);
   const currentYear = now.getFullYear();
@@ -665,9 +667,11 @@ export default function LogsScreen() {
                       subtitle={`${entry.vehicleName} | ${entry.summary}`}
                       meta={formatDate(entry.date)}
                       onPress={() =>
-                        router.push({
-                          pathname: '/entries/[entryId]',
-                          params: { entryId: entry.id },
+                        runGuarded(() => {
+                          router.push({
+                            pathname: '/entries/[entryId]',
+                            params: { entryId: entry.id },
+                          });
                         })
                       }
                     />
@@ -723,4 +727,3 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
 });
-
