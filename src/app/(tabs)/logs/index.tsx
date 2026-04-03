@@ -110,8 +110,8 @@ export default function LogsScreen() {
   const [includeFuel, setIncludeFuel] = useState(true);
   const [includeReceipts, setIncludeReceipts] = useState(false);
 
-  const [isVehicleScopeOpen, setIsVehicleScopeOpen] = useState(true);
-  const [isPeriodOpen, setIsPeriodOpen] = useState(true);
+  const [isVehicleScopeOpen, setIsVehicleScopeOpen] = useState(false);
+  const [isPeriodOpen, setIsPeriodOpen] = useState(false);
   const [openSecondary, setOpenSecondary] = useState<SecondaryAccordionKey | null>(null);
 
   const [preview, setPreview] = useState<ExportPreview | null>(null);
@@ -347,8 +347,8 @@ export default function LogsScreen() {
     setFuelType('all');
     setIncludeFuel(true);
     setIncludeReceipts(false);
-    setIsVehicleScopeOpen(true);
-    setIsPeriodOpen(true);
+    setIsVehicleScopeOpen(false);
+    setIsPeriodOpen(false);
     setOpenSecondary(null);
   }, [applyYearDefaults, currentYear]);
 
