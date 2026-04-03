@@ -338,6 +338,7 @@ function RootNavigator() {
             <Stack.Screen name="vehicles/new" options={{ title: t('root.addVehicle') }} />
             <Stack.Screen name="vehicles/[vehicleId]" options={{ title: t('root.vehicleDetail') }} />
             <Stack.Screen name="vehicles/[vehicleId]/edit" options={{ title: t('root.editVehicle') }} />
+            <Stack.Screen name="vehicles/[vehicleId]/history" options={{ title: t('root.vehicleHistory') }} />
             <Stack.Screen name="trips/new" options={{ title: t('root.addTrip') }} />
             <Stack.Screen name="fuel/new" options={{ title: t('root.addFuelEntry') }} />
             <Stack.Screen name="entries/[entryId]" options={{ title: t('root.entryDetail') }} />
