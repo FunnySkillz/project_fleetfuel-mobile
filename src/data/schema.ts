@@ -1,2 +1,2 @@
 export const DATABASE_NAME = 'fleetfuel.db';
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 7;
