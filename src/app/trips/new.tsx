@@ -34,6 +34,19 @@ type TripFormErrors = {
   notes?: string;
 };
 
+type TripDraft = {
+  selectedVehicleId: string;
+  startOdometer: string;
+  endOdometer: string;
+  purpose: string;
+  startTime: string;
+  endTime: string;
+  startLocation: string;
+  endLocation: string;
+  notes: string;
+  privateTag: TripPrivateTag;
+};
+
 function normalizeText(value: string) {
   return value.trim().replace(/\s+/g, ' ');
 }
@@ -85,7 +98,11 @@ export default function AddTripScreen() {
   const [endLocation, setEndLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [privateTag, setPrivateTag] = useState<TripPrivateTag>(null);
+  const [startSuggestionLoading, setStartSuggestionLoading] = useState(false);
   const startOdometerEditedRef = useRef(false);
+  const userInteractedRef = useRef(false);
+  const systemDraftJsonRef = useRef<string | null>(null);
+  const [initialDraftJson, setInitialDraftJson] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const notesFieldYRef = useRef(0);
 
@@ -157,6 +174,7 @@ export default function AddTripScreen() {
     if (!selectedVehicleId) {
       setEffectiveCurrentKm(null);
       setStartSuggestionSource(null);
+      setStartSuggestionLoading(false);
       startOdometerEditedRef.current = false;
       setStartOdometer('');
       return;
@@ -166,6 +184,7 @@ export default function AddTripScreen() {
     setStartOdometer('');
     setEffectiveCurrentKm(null);
     setStartSuggestionSource(null);
+    setStartSuggestionLoading(true);
 
     let cancelled = false;
     void entriesRepo
@@ -188,6 +207,13 @@ export default function AddTripScreen() {
 
         setEffectiveCurrentKm(null);
         setStartSuggestionSource(null);
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setStartSuggestionLoading(false);
       });
 
     return () => {
@@ -220,18 +246,41 @@ export default function AddTripScreen() {
       ? endKmValue - startKmValue
       : null;
 
+  const currentDraft = useMemo<TripDraft>(
+    () => ({
+      selectedVehicleId,
+      startOdometer,
+      endOdometer,
+      purpose,
+      startTime,
+      endTime,
+      startLocation,
+      endLocation,
+      notes,
+      privateTag,
+    }),
+    [endLocation, endOdometer, endTime, notes, privateTag, purpose, selectedVehicleId, startLocation, startOdometer, startTime],
+  );
+  const currentDraftJson = useMemo(() => JSON.stringify(currentDraft), [currentDraft]);
+  const defaultsSettled = !vehiclesLoading && (!selectedVehicleId || !startSuggestionLoading);
+
+  useEffect(() => {
+    if (!userInteractedRef.current) {
+      systemDraftJsonRef.current = currentDraftJson;
+    }
+  }, [currentDraftJson]);
+
+  useEffect(() => {
+    if (initialDraftJson !== null || !defaultsSettled) {
+      return;
+    }
+
+    setInitialDraftJson(systemDraftJsonRef.current ?? currentDraftJson);
+  }, [currentDraftJson, defaultsSettled, initialDraftJson]);
+
   const isDirty = useMemo(
-    () =>
-      endOdometer.trim().length > 0 ||
-      purpose.trim().length > 0 ||
-      startTime.trim().length > 0 ||
-      endTime.trim() !== initialEndTimeRef.current ||
-      startLocation.trim().length > 0 ||
-      endLocation.trim().length > 0 ||
-      notes.trim().length > 0 ||
-      privateTag !== null ||
-      saving,
-    [endLocation, endOdometer, endTime, notes, privateTag, purpose, saving, startLocation, startTime],
+    () => (initialDraftJson !== null && currentDraftJson !== initialDraftJson) || saving,
+    [currentDraftJson, initialDraftJson, saving],
   );
   const { allowNextNavigation } = useUnsavedChangesGuard(isDirty);
 
@@ -336,6 +385,9 @@ export default function AddTripScreen() {
 
   const canSubmit = !saving && isValid;
   const showError = (field: keyof typeof touched) => (submitAttempted || touched[field]) && Boolean(errors[field]);
+  const markUserInteracted = () => {
+    userInteractedRef.current = true;
+  };
 
   const handleSave = async () => {
     if (saving) {
@@ -376,6 +428,7 @@ export default function AddTripScreen() {
         privateTag,
       });
 
+      setInitialDraftJson(currentDraftJson);
       allowNextNavigation();
       router.back();
     } catch (error) {
@@ -425,6 +478,7 @@ export default function AddTripScreen() {
                   vehicles={vehicles}
                   value={selectedVehicleId || null}
                   onChange={(value) => {
+                    markUserInteracted();
                     setSelectedVehicleId(value);
                     setTouched((prev) => ({ ...prev, vehicleId: true }));
                   }}
@@ -456,12 +510,13 @@ export default function AddTripScreen() {
                   : t('tripForm.hint.startKmNoLatest')
               }
               error={showError('startOdometer') ? errors.startOdometer : null}>
-              <Input
-                value={startOdometer}
-                onChangeText={(value) => {
-                  startOdometerEditedRef.current = true;
-                  setStartOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS));
-                }}
+                <Input
+                  value={startOdometer}
+                  onChangeText={(value) => {
+                    markUserInteracted();
+                    startOdometerEditedRef.current = true;
+                    setStartOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS));
+                  }}
                 onBlur={() => setTouched((prev) => ({ ...prev, startOdometer: true }))}
                 keyboardType="number-pad"
                 placeholder={effectiveCurrentKm !== null ? String(effectiveCurrentKm) : t('tripForm.placeholder.currentKm')}
@@ -475,7 +530,10 @@ export default function AddTripScreen() {
               error={showError('endOdometer') ? errors.endOdometer : null}>
               <Input
                 value={endOdometer}
-                onChangeText={(value) => setEndOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS))}
+                onChangeText={(value) => {
+                  markUserInteracted();
+                  setEndOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS));
+                }}
                 onBlur={() => setTouched((prev) => ({ ...prev, endOdometer: true }))}
                 keyboardType="number-pad"
                 placeholder={t('tripForm.placeholder.currentKm')}
@@ -498,7 +556,10 @@ export default function AddTripScreen() {
               error={showError('purpose') ? errors.purpose : null}>
               <Input
                 value={purpose}
-                onChangeText={(value) => setPurpose(value.replace(/\n/g, ' ').slice(0, PURPOSE_MAX))}
+                onChangeText={(value) => {
+                  markUserInteracted();
+                  setPurpose(value.replace(/\n/g, ' ').slice(0, PURPOSE_MAX));
+                }}
                 onBlur={() => setTouched((prev) => ({ ...prev, purpose: true }))}
                 placeholder={t('tripForm.placeholder.purpose')}
                 autoCapitalize="sentences"
@@ -514,9 +575,13 @@ export default function AddTripScreen() {
                   <DateTimeField
                     mode="time"
                     value={startTime}
-                    onChangeText={(value) => setStartTime(sanitizeTimeInput(value))}
+                    onChangeText={(value) => {
+                      markUserInteracted();
+                      setStartTime(sanitizeTimeInput(value));
+                    }}
                     onBlur={() => setTouched((prev) => ({ ...prev, startTime: true }))}
                     onClear={() => {
+                      markUserInteracted();
                       setStartTime('');
                       setTouched((prev) => ({ ...prev, startTime: true }));
                     }}
@@ -532,9 +597,13 @@ export default function AddTripScreen() {
                   <DateTimeField
                     mode="time"
                     value={endTime}
-                    onChangeText={(value) => setEndTime(sanitizeTimeInput(value))}
+                    onChangeText={(value) => {
+                      markUserInteracted();
+                      setEndTime(sanitizeTimeInput(value));
+                    }}
                     onBlur={() => setTouched((prev) => ({ ...prev, endTime: true }))}
                     onClear={() => {
+                      markUserInteracted();
                       setEndTime('');
                       setTouched((prev) => ({ ...prev, endTime: true }));
                     }}
@@ -549,7 +618,10 @@ export default function AddTripScreen() {
             <FormField label={t('tripForm.field.startLocation')} error={showError('startLocation') ? errors.startLocation : null}>
               <Input
                 value={startLocation}
-                onChangeText={(value) => setStartLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX))}
+                onChangeText={(value) => {
+                  markUserInteracted();
+                  setStartLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX));
+                }}
                 onBlur={() => setTouched((prev) => ({ ...prev, startLocation: true }))}
                 placeholder={t('tripForm.placeholder.startLocation')}
                 autoCapitalize="words"
@@ -562,7 +634,10 @@ export default function AddTripScreen() {
             <FormField label={t('tripForm.field.endLocation')} error={showError('endLocation') ? errors.endLocation : null}>
               <Input
                 value={endLocation}
-                onChangeText={(value) => setEndLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX))}
+                onChangeText={(value) => {
+                  markUserInteracted();
+                  setEndLocation(value.replace(/\n/g, ' ').slice(0, LOCATION_MAX));
+                }}
                 onBlur={() => setTouched((prev) => ({ ...prev, endLocation: true }))}
                 placeholder={t('tripForm.placeholder.endLocation')}
                 autoCapitalize="words"
@@ -584,6 +659,7 @@ export default function AddTripScreen() {
                 ]}
                 value={privateTag}
                 onChange={(value) => {
+                  markUserInteracted();
                   setPrivateTag(value as Exclude<TripPrivateTag, null>);
                   setTouched((prev) => ({ ...prev, privateTag: true }));
                 }}
@@ -599,7 +675,10 @@ export default function AddTripScreen() {
                 error={showError('notes') ? errors.notes : null}>
                 <TextArea
                   value={notes}
-                  onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
+                  onChangeText={(value) => {
+                    markUserInteracted();
+                    setNotes(value.slice(0, NOTES_MAX));
+                  }}
                   onFocus={() => {
                     requestAnimationFrame(() => {
                       scrollToNotes();
