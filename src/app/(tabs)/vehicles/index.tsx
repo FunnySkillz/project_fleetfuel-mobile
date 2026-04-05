@@ -14,18 +14,14 @@ import type { VehicleListItem } from '@/data/types';
 import { useI18n } from '@/hooks/use-i18n';
 import { useNavigationPressGuard } from '@/hooks/use-navigation-press-guard';
 import { useTheme } from '@/hooks/use-theme';
+import { formatIsoDateLocal } from '@/utils/date-format';
 
 function formatDate(iso: string | null, fallback: string) {
   if (!iso) {
     return fallback;
   }
 
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) {
-    return iso;
-  }
-
-  return parsed.toISOString().slice(0, 10);
+  return formatIsoDateLocal(iso);
 }
 
 export default function VehiclesScreen() {
