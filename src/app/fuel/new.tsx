@@ -50,6 +50,22 @@ type FuelFormErrors = {
   receipt?: string;
 };
 
+type FuelDraft = {
+  selectedVehicleId: string;
+  fuelType: FuelType | null;
+  liters: string;
+  fuelInTankAfterRefuel: string;
+  price: string;
+  station: string;
+  odometer: string;
+  notes: string;
+  receipt: {
+    uri: string;
+    name: string;
+    mimeType: string | null;
+  } | null;
+};
+
 function normalizeText(value: string) {
   return value.trim().replace(/\s+/g, ' ');
 }
@@ -91,7 +107,11 @@ export default function AddFuelEntryScreen() {
   const [latestRecordedKm, setLatestRecordedKm] = useState<number | null>(null);
   const [odometerSuggestionSource, setOdometerSuggestionSource] = useState<'latestEntry' | 'vehicleBaseline' | null>(null);
   const [previousFuelKm, setPreviousFuelKm] = useState<number | null>(null);
+  const [odometerSuggestionLoading, setOdometerSuggestionLoading] = useState(false);
   const odometerEditedRef = useRef(false);
+  const userInteractedRef = useRef(false);
+  const systemDraftJsonRef = useRef<string | null>(null);
+  const [initialDraftJson, setInitialDraftJson] = useState<string | null>(null);
 
   const [liters, setLiters] = useState('');
   const [fuelInTankAfterRefuel, setFuelInTankAfterRefuel] = useState('');
@@ -171,6 +191,7 @@ export default function AddFuelEntryScreen() {
       setLatestRecordedKm(null);
       setOdometerSuggestionSource(null);
       setPreviousFuelKm(null);
+      setOdometerSuggestionLoading(false);
       odometerEditedRef.current = false;
       setOdometer('');
       return;
@@ -178,6 +199,7 @@ export default function AddFuelEntryScreen() {
 
     odometerEditedRef.current = false;
     setOdometer('');
+    setOdometerSuggestionLoading(true);
     let cancelled = false;
     void Promise.all([
       entriesRepo.resolveEffectiveCurrentOdometer(selectedVehicleId),
@@ -204,6 +226,12 @@ export default function AddFuelEntryScreen() {
         setLatestRecordedKm(null);
         setOdometerSuggestionSource(null);
         setPreviousFuelKm(null);
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+        setOdometerSuggestionLoading(false);
       });
 
     return () => {
@@ -258,18 +286,49 @@ export default function AddFuelEntryScreen() {
   const avgConsumptionPreview = calculateAvgConsumption(litersValue, odometerValue, previousFuelKm);
   const fuelTypeOptions = useMemo(() => buildFuelTypeOptions(t), [t]);
 
+  const currentDraft = useMemo<FuelDraft>(
+    () => ({
+      selectedVehicleId,
+      fuelType,
+      liters,
+      fuelInTankAfterRefuel,
+      price,
+      station,
+      odometer,
+      notes,
+      receipt: receipt
+        ? {
+            uri: receipt.uri,
+            name: receipt.name,
+            mimeType: receipt.mimeType ?? null,
+          }
+        : null,
+    }),
+    [fuelInTankAfterRefuel, fuelType, liters, notes, odometer, price, receipt, selectedVehicleId, station],
+  );
+  const currentDraftJson = useMemo(() => JSON.stringify(currentDraft), [currentDraft]);
+  const defaultsSettled = !vehiclesLoading && (!selectedVehicleId || !odometerSuggestionLoading);
+
+  useEffect(() => {
+    if (!userInteractedRef.current) {
+      systemDraftJsonRef.current = currentDraftJson;
+    }
+  }, [currentDraftJson]);
+
+  useEffect(() => {
+    if (initialDraftJson !== null || !defaultsSettled) {
+      return;
+    }
+
+    setInitialDraftJson(systemDraftJsonRef.current ?? currentDraftJson);
+  }, [currentDraftJson, defaultsSettled, initialDraftJson]);
+
   const isDirty = useMemo(
     () =>
-      fuelType !== null ||
-      liters.trim().length > 0 ||
-      fuelInTankAfterRefuel.trim().length > 0 ||
-      price.trim().length > 0 ||
-      station.trim().length > 0 ||
-      notes.trim().length > 0 ||
-      receipt !== null ||
+      (initialDraftJson !== null && currentDraftJson !== initialDraftJson) ||
       saving ||
       attachmentBusy,
-    [attachmentBusy, fuelInTankAfterRefuel, fuelType, liters, notes, price, receipt, saving, station],
+    [attachmentBusy, currentDraftJson, initialDraftJson, saving],
   );
   const { allowNextNavigation } = useUnsavedChangesGuard(isDirty);
 
@@ -371,6 +430,9 @@ export default function AddFuelEntryScreen() {
 
   const canSubmit = isValid && !saving && !attachmentBusy;
   const showError = (field: keyof typeof touched) => (submitAttempted || touched[field]) && Boolean(errors[field]);
+  const markUserInteracted = () => {
+    userInteractedRef.current = true;
+  };
 
   const handleSave = async () => {
     if (saving || attachmentBusy) {
@@ -415,6 +477,7 @@ export default function AddFuelEntryScreen() {
         notes: normalizeText(notes) || null,
       });
 
+      setInitialDraftJson(currentDraftJson);
       allowNextNavigation();
       router.back();
     } catch (error) {
@@ -458,6 +521,7 @@ export default function AddFuelEntryScreen() {
         name: copied.name,
         mimeType: asset.mimeType ?? 'image/jpeg',
       });
+      markUserInteracted();
       setTouched((prev) => ({ ...prev, receipt: true }));
     } catch (error) {
       Alert.alert(t('fuelForm.alert.attachPhotoFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
@@ -501,6 +565,7 @@ export default function AddFuelEntryScreen() {
         name: copied.name,
         mimeType: asset.mimeType ?? 'image/jpeg',
       });
+      markUserInteracted();
       setTouched((prev) => ({ ...prev, receipt: true }));
     } catch (error) {
       Alert.alert(t('fuelForm.alert.attachImageFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
@@ -538,6 +603,7 @@ export default function AddFuelEntryScreen() {
         name: copied.name,
         mimeType: asset.mimeType ?? 'application/pdf',
       });
+      markUserInteracted();
       setTouched((prev) => ({ ...prev, receipt: true }));
     } catch (error) {
       Alert.alert(t('fuelForm.alert.attachPdfFailedTitle'), error instanceof Error ? error.message : t('common.unexpectedError'));
@@ -574,6 +640,7 @@ export default function AddFuelEntryScreen() {
                   vehicles={vehicles}
                   value={selectedVehicleId || null}
                   onChange={(value) => {
+                    markUserInteracted();
                     setSelectedVehicleId(value);
                     setTouched((prev) => ({ ...prev, vehicleId: true }));
                   }}
@@ -602,6 +669,7 @@ export default function AddFuelEntryScreen() {
                 options={fuelTypeOptions}
                 value={fuelType}
                 onChange={(value) => {
+                  markUserInteracted();
                   setFuelType(value as FuelType);
                   setFuelTypeManuallyEdited(true);
                   setTouched((prev) => ({ ...prev, fuelType: true }));
@@ -623,6 +691,7 @@ export default function AddFuelEntryScreen() {
                 <Input
                   value={odometer}
                   onChangeText={(value) => {
+                    markUserInteracted();
                     odometerEditedRef.current = true;
                     setOdometer(sanitizeIntegerInput(value, ODOMETER_DIGITS));
                   }}
@@ -636,7 +705,10 @@ export default function AddFuelEntryScreen() {
             <FormField label={t('fuelForm.field.liters')} required error={showError('liters') ? errors.liters : null}>
               <Input
                 value={liters}
-                onChangeText={(value) => setLiters(sanitizeDecimalInput(value, LITERS_INTEGER_DIGITS, LITERS_FRACTION_DIGITS))}
+                onChangeText={(value) => {
+                  markUserInteracted();
+                  setLiters(sanitizeDecimalInput(value, LITERS_INTEGER_DIGITS, LITERS_FRACTION_DIGITS));
+                }}
                 onBlur={() => setTouched((prev) => ({ ...prev, liters: true }))}
                 keyboardType="decimal-pad"
                 placeholder={t('fuelForm.placeholder.liters')}
@@ -651,9 +723,12 @@ export default function AddFuelEntryScreen() {
               <Input
                 value={fuelInTankAfterRefuel}
                 onChangeText={(value) =>
-                  setFuelInTankAfterRefuel(
-                    sanitizeDecimalInput(value, FUEL_IN_TANK_INTEGER_DIGITS, FUEL_IN_TANK_FRACTION_DIGITS),
-                  )
+                  {
+                    markUserInteracted();
+                    setFuelInTankAfterRefuel(
+                      sanitizeDecimalInput(value, FUEL_IN_TANK_INTEGER_DIGITS, FUEL_IN_TANK_FRACTION_DIGITS),
+                    );
+                  }
                 }
                 onBlur={() => setTouched((prev) => ({ ...prev, fuelInTankAfterRefuel: true }))}
                 keyboardType="decimal-pad"
@@ -665,7 +740,10 @@ export default function AddFuelEntryScreen() {
             <FormField label={t('fuelForm.field.price')} required error={showError('price') ? errors.price : null}>
               <Input
                 value={price}
-                onChangeText={(value) => setPrice(sanitizeDecimalInput(value, PRICE_INTEGER_DIGITS, PRICE_FRACTION_DIGITS))}
+                onChangeText={(value) => {
+                  markUserInteracted();
+                  setPrice(sanitizeDecimalInput(value, PRICE_INTEGER_DIGITS, PRICE_FRACTION_DIGITS));
+                }}
                 onBlur={() => setTouched((prev) => ({ ...prev, price: true }))}
                 keyboardType="decimal-pad"
                 placeholder={t('fuelForm.placeholder.price')}
@@ -680,7 +758,10 @@ export default function AddFuelEntryScreen() {
               error={showError('station') ? errors.station : null}>
               <Input
                 value={station}
-                onChangeText={(value) => setStation(value.replace(/\n/g, ' ').slice(0, STATION_MAX))}
+                onChangeText={(value) => {
+                  markUserInteracted();
+                  setStation(value.replace(/\n/g, ' ').slice(0, STATION_MAX));
+                }}
                 onBlur={() => setTouched((prev) => ({ ...prev, station: true }))}
                 placeholder={t('fuelForm.placeholder.station')}
                 autoCapitalize="words"
@@ -743,7 +824,10 @@ export default function AddFuelEntryScreen() {
                     label={t('fuelForm.removeReceipt')}
                     variant="ghost"
                     size="sm"
-                    onPress={() => setReceipt(null)}
+                    onPress={() => {
+                      markUserInteracted();
+                      setReceipt(null);
+                    }}
                     className="self-start"
                   />
                 </Card>
@@ -756,7 +840,10 @@ export default function AddFuelEntryScreen() {
               error={showError('notes') ? errors.notes : null}>
               <TextArea
                 value={notes}
-                onChangeText={(value) => setNotes(value.slice(0, NOTES_MAX))}
+                onChangeText={(value) => {
+                  markUserInteracted();
+                  setNotes(value.slice(0, NOTES_MAX));
+                }}
                 onBlur={() => setTouched((prev) => ({ ...prev, notes: true }))}
                 placeholder={t('fuelForm.placeholder.notes')}
                 autoCapitalize="sentences"
