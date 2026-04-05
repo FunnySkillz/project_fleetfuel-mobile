@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 
 import { logsRepo } from '@/data/repositories';
 import type { ExportFuelRow, ExportTripRow, ExportVehicleSection, LogsExportDataset, LogsExportFilters } from '@/data/types';
+import { formatIsoDateLocal } from '@/utils/date-format';
 
 function escapeHtml(value: string) {
   return value
@@ -15,12 +16,7 @@ function escapeHtml(value: string) {
 }
 
 function formatDate(iso: string) {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) {
-    return iso;
-  }
-
-  return parsed.toISOString().slice(0, 10);
+  return formatIsoDateLocal(iso);
 }
 
 function formatDateTime(iso: string) {
