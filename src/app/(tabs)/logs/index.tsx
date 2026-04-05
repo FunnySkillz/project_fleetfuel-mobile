@@ -26,15 +26,11 @@ import { useNavigationPressGuard } from '@/hooks/use-navigation-press-guard';
 import { useTheme } from '@/hooks/use-theme';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { generateLogsPdf } from '@/services/export/generate-logs-pdf';
+import { formatIsoDateLocal, formatLocalDate } from '@/utils/date-format';
 import { buildFuelTypeFilterOptions } from '@/utils/fuel-type-options';
 
 function formatDate(iso: string) {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) {
-    return iso;
-  }
-
-  return parsed.toISOString().slice(0, 10);
+  return formatIsoDateLocal(iso);
 }
 
 function sanitizeDayDateInput(value: string) {
@@ -43,13 +39,6 @@ function sanitizeDayDateInput(value: string) {
 
 function isValidDayDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function formatLocalDay(value: Date) {
-  const year = String(value.getFullYear());
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 function resolvePeriodRange(year: number, currentYear: number, todayLocal: string) {
@@ -76,7 +65,7 @@ export default function LogsScreen() {
 
   const now = useMemo(() => new Date(), []);
   const currentYear = now.getFullYear();
-  const todayLocal = formatLocalDay(now);
+  const todayLocal = formatLocalDate(now);
   const currentYearPeriod = useMemo(() => resolvePeriodRange(currentYear, currentYear, todayLocal), [currentYear, todayLocal]);
   const yearOptions = useMemo(() => [currentYear, currentYear - 1, currentYear - 2], [currentYear]);
   const usageOptions = useMemo(
