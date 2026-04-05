@@ -7,10 +7,12 @@ import { ThemedView } from '@/components/themed-view';
 import { ActionRow, Card, SectionHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useNavigationPressGuard } from '@/hooks/use-navigation-press-guard';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { t } = useI18n();
+  const { runGuarded } = useNavigationPressGuard();
 
   return (
     <ThemedView style={styles.container}>
@@ -25,17 +27,29 @@ export default function SettingsScreen() {
             <ActionRow
               label={t('settings.appearance.label')}
               description={t('settings.appearance.description')}
-              onPress={() => router.push('/settings/appearance')}
+              onPress={() =>
+                runGuarded(() => {
+                  router.push('/settings/appearance');
+                })
+              }
             />
             <ActionRow
               label={t('settings.security.label')}
               description={t('settings.security.rowDescription')}
-              onPress={() => router.push('/settings/security')}
+              onPress={() =>
+                runGuarded(() => {
+                  router.push('/settings/security');
+                })
+              }
             />
             <ActionRow
               label={t('settings.backup.label')}
               description={t('settings.backup.description')}
-              onPress={() => router.push('/settings/backup-restore')}
+              onPress={() =>
+                runGuarded(() => {
+                  router.push('/settings/backup-restore');
+                })
+              }
             />
           </Card>
         </ScrollView>
