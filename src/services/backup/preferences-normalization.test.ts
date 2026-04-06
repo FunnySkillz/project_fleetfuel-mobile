@@ -8,12 +8,14 @@ describe('backup preference normalization', () => {
       themeMode: 'dark',
       language: 'de',
       appLockEnabled: true,
+      appMode: 'shared',
     });
 
     expect(normalized).toEqual({
       themeMode: 'dark',
       language: 'de',
       appLockEnabled: true,
+      appMode: 'shared',
     });
   });
 
@@ -24,5 +26,6 @@ describe('backup preference normalization', () => {
     });
 
     expect(normalized.appLockEnabled).toBe(false);
+    expect(normalized.appMode).toBe('local');
   });
 });
