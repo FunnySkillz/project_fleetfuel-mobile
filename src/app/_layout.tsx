@@ -28,9 +28,46 @@ export default function RootLayout() {
   );
 }
 
+function RootNavigator() {
+  const { isHydrated, preferences, resolvedTheme } = useAppPreferences();
+
+  if (!isHydrated) {
+    return (
+      <ThemeProvider value={resolvedTheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <AnimatedSplashOverlay />
+        <RecoveryGate
+          isLoading
+          error={null}
+          recovering={false}
+          onRetry={() => {}}
+          onRestore={() => {}}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  if (preferences.appMode === 'shared') {
+    return (
+      <ThemeProvider value={resolvedTheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <AnimatedSplashOverlay />
+        <Stack
+          initialRouteName="shared"
+          screenOptions={{
+            headerBackButtonDisplayMode: 'minimal',
+            headerBackButtonMenuEnabled: false,
+          }}>
+          <Stack.Screen name="shared" options={{ headerShown: false }} />
+        </Stack>
+      </ThemeProvider>
+    );
+  }
+
+  return <LocalRootNavigator />;
+}
+
 type HealthStatus = 'checking' | 'healthy' | 'recoverable_error';
 
-function RootNavigator() {
+function LocalRootNavigator() {
   const {
     resolvedTheme,
     reloadPreferences,
@@ -352,6 +389,7 @@ function RootNavigator() {
             <Stack.Screen name="entries/[entryId]/edit" options={{ title: t('root.editEntry') }} />
             <Stack.Screen name="logs/export" options={{ title: t('root.exportLogs') }} />
             <Stack.Screen name="settings/appearance" options={{ title: t('root.appearance') }} />
+            <Stack.Screen name="settings/mode" options={{ title: t('root.mode') }} />
             <Stack.Screen name="settings/security" options={{ title: t('root.security') }} />
             <Stack.Screen name="settings/backup-restore" options={{ title: t('root.backupRestore') }} />
           </Stack>
