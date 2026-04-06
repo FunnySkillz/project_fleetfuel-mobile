@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,6 +24,15 @@ export default function SettingsScreen() {
           />
 
           <Card className="gap-2">
+            <ActionRow
+              label={t('settings.mode.label')}
+              description={t('settings.mode.description')}
+              onPress={() =>
+                runGuarded(() => {
+                  router.push('/settings/mode' as Href);
+                })
+              }
+            />
             <ActionRow
               label={t('settings.appearance.label')}
               description={t('settings.appearance.description')}
