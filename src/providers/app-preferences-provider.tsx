@@ -4,7 +4,7 @@ import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createDefaultPreferences } from '@/preferences/defaults';
 import { loadPreferences, savePreferences } from '@/preferences/storage';
-import type { AppLanguage, AppPreferences, ThemeMode } from '@/preferences/types';
+import type { AppLanguage, AppMode, AppPreferences, ThemeMode } from '@/preferences/types';
 
 type ResolvedTheme = 'light' | 'dark';
 
@@ -15,6 +15,7 @@ type AppPreferencesContextValue = {
   setThemeMode: (mode: ThemeMode) => Promise<void>;
   setLanguage: (language: AppLanguage) => Promise<void>;
   setAppLockEnabled: (enabled: boolean) => Promise<void>;
+  setAppMode: (mode: AppMode) => Promise<void>;
   reloadPreferences: () => Promise<void>;
 };
 
@@ -27,6 +28,7 @@ const AppPreferencesContext = createContext<AppPreferencesContextValue>({
   setThemeMode: async () => {},
   setLanguage: async () => {},
   setAppLockEnabled: async () => {},
+  setAppMode: async () => {},
   reloadPreferences: async () => {},
 });
 
@@ -130,6 +132,19 @@ export function AppPreferencesProvider({ children }: React.PropsWithChildren) {
     [updatePreferences],
   );
 
+  const setAppMode = useCallback(
+    async (mode: AppMode) => {
+      await updatePreferences((current) => {
+        if (current.appMode === mode) {
+          return current;
+        }
+
+        return { ...current, appMode: mode };
+      });
+    },
+    [updatePreferences],
+  );
+
   const value = useMemo<AppPreferencesContextValue>(
     () => ({
       preferences,
@@ -138,9 +153,10 @@ export function AppPreferencesProvider({ children }: React.PropsWithChildren) {
       setThemeMode,
       setLanguage,
       setAppLockEnabled,
+      setAppMode,
       reloadPreferences,
     }),
-    [isHydrated, preferences, reloadPreferences, setAppLockEnabled, setLanguage, setThemeMode, systemScheme],
+    [isHydrated, preferences, reloadPreferences, setAppLockEnabled, setAppMode, setLanguage, setThemeMode, systemScheme],
   );
 
   return <AppPreferencesContext.Provider value={value}>{children}</AppPreferencesContext.Provider>;
