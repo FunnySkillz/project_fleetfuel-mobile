@@ -11,6 +11,8 @@ FleetFuel is a mobile-first, local-first/offline-first app for tracking:
 
 MVP is intentionally backend-free. No sync, no roles, no company/admin workflows.
 
+Shared Fleet Sprint 1 is now available as an isolated cloud-backed mode. Local MVP flows stay fully intact and unchanged in Local mode.
+
 ## Current MVP scope
 
 Implemented core navigation and workflows:
@@ -39,7 +41,29 @@ Data safety/hardening implemented:
 - TypeScript
 - NativeWind/Tailwind utilities + shared shadcn-style UI primitives
 - Expo SQLite for local persistence
+- Supabase (Shared Fleet mode only)
 - Vitest (logic-first test baseline)
+
+## Shared Fleet mode (Sprint 1)
+
+- App mode switch: `Settings -> App Mode`
+- Shared mode scope:
+  - Supabase Auth (email + password)
+  - Fleet bootstrap
+  - Membership listing
+  - Invitation create / revoke / accept
+- Local and Shared modes are intentionally isolated in this phase (no migration).
+
+### Required env vars for Shared mode
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+Supabase server assets are in `supabase/`:
+
+- migrations: `supabase/migrations`
+- edge functions: `supabase/functions`
+- DB policy tests: `supabase/tests`
 
 ## Project structure
 
@@ -102,6 +126,7 @@ npx expo export --platform web --clear
 Key internal docs:
 
 - `docs/product/mvp-definition.md`
+- `docs/product/shared-fleet-sprint1.md`
 - `docs/design/navigation-layout-qa.md`
 - `docs/release/production-readiness.md`
 - `docs/project/lessons-learned-v1.md`
