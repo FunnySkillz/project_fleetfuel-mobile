@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { createDefaultPreferences } from './defaults';
-import type { AppLanguage, AppPreferences, ThemeMode } from './types';
+import type { AppLanguage, AppMode, AppPreferences, ThemeMode } from './types';
 
 const STORAGE_KEY = 'fleetfuel.preferences.v1';
 
@@ -17,6 +17,10 @@ function isBoolean(value: unknown): value is boolean {
   return typeof value === 'boolean';
 }
 
+function isAppMode(value: unknown): value is AppMode {
+  return value === 'local' || value === 'shared';
+}
+
 function normalizeStoredPreferences(value: unknown): AppPreferences {
   const fallback = createDefaultPreferences();
 
@@ -24,12 +28,13 @@ function normalizeStoredPreferences(value: unknown): AppPreferences {
     return fallback;
   }
 
-  const record = value as { themeMode?: unknown; language?: unknown; appLockEnabled?: unknown };
+  const record = value as { themeMode?: unknown; language?: unknown; appLockEnabled?: unknown; appMode?: unknown };
 
   return {
     themeMode: isThemeMode(record.themeMode) ? record.themeMode : fallback.themeMode,
     language: isAppLanguage(record.language) ? record.language : fallback.language,
     appLockEnabled: isBoolean(record.appLockEnabled) ? record.appLockEnabled : fallback.appLockEnabled,
+    appMode: isAppMode(record.appMode) ? record.appMode : fallback.appMode,
   };
 }
 
