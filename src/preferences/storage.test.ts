@@ -33,6 +33,7 @@ describe('preferences storage normalization', () => {
     expect(preferences.themeMode).toBe('dark');
     expect(preferences.language).toBe('de');
     expect(preferences.appLockEnabled).toBe(false);
+    expect(preferences.appMode).toBe('local');
   });
 
   it('persists and reloads appLockEnabled', async () => {
@@ -40,6 +41,7 @@ describe('preferences storage normalization', () => {
       themeMode: 'light',
       language: 'en',
       appLockEnabled: true,
+      appMode: 'shared',
     });
 
     const loaded = await loadPreferences();
@@ -47,5 +49,6 @@ describe('preferences storage normalization', () => {
     expect(loaded.themeMode).toBe('light');
     expect(loaded.language).toBe('en');
     expect(loaded.appLockEnabled).toBe(true);
+    expect(loaded.appMode).toBe('shared');
   });
 });
