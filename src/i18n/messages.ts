@@ -49,6 +49,7 @@ export const enMessages = {
   'root.vehicleHistory': 'Vehicle History',
   'root.exportLogs': 'Export Logs',
   'root.appearance': 'Appearance',
+  'root.mode': 'App Mode',
   'root.security': 'Security',
   'root.backupRestore': 'Backup and Restore',
 
@@ -68,6 +69,8 @@ export const enMessages = {
   'settings.security.rowDescription': 'Face ID/biometric app lock and PIN fallback.',
   'settings.backup.label': 'Backup and Restore',
   'settings.backup.description': 'Local backup and restore flow remains part of MVP readiness gate.',
+  'settings.mode.label': 'App Mode',
+  'settings.mode.description': 'Switch between local-only and Shared Fleet cloud workspace.',
 
   'settings.security.title': 'Security',
   'settings.security.description': 'Control app lock behavior and PIN fallback on this device.',
@@ -657,6 +660,7 @@ export const deMessages: Partial<Record<TranslationKey, string>> = {
   'root.vehicleHistory': 'Fahrzeughistorie',
   'root.exportLogs': 'Protokolle exportieren',
   'root.appearance': 'Darstellung',
+  'root.mode': 'App-Modus',
   'root.security': 'Sicherheit',
   'root.backupRestore': 'Sichern und Wiederherstellen',
 
@@ -676,6 +680,8 @@ export const deMessages: Partial<Record<TranslationKey, string>> = {
   'settings.security.rowDescription': 'Face ID/Biometrie-App-Sperre und PIN-Fallback.',
   'settings.backup.label': 'Sichern und Wiederherstellen',
   'settings.backup.description': 'Lokale Sicherung/Wiederherstellung bleibt Teil des MVP-Release-Gates.',
+  'settings.mode.label': 'App-Modus',
+  'settings.mode.description': 'Wechsle zwischen lokalem Modus und Shared-Fleet-Cloudbereich.',
 
   'settings.security.title': 'Sicherheit',
   'settings.security.description': 'Steuere App-Sperre und PIN-Fallback auf diesem Geraet.',
