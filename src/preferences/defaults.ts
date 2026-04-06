@@ -12,5 +12,6 @@ export function createDefaultPreferences(): AppPreferences {
     themeMode: DEFAULT_THEME_MODE,
     language: detectDefaultLanguage(),
     appLockEnabled: false,
+    appMode: 'local',
   };
 }
