@@ -1,9 +1,13 @@
 import type {
   AssignmentStatus,
+  FleetAuditLog,
   FleetAssignmentMetrics,
+  FleetNotification,
   Profile,
+  SharedJson,
   Vehicle,
   VehicleAssignment,
+  NotificationEventType,
   VehicleStatus,
   VehicleWithEffectiveStatus,
 } from '@/shared-fleet/types';
@@ -24,6 +28,9 @@ export type VehicleRow = {
   status: Vehicle['status'];
   blocked_until: string | null;
   blocked_reason: string | null;
+  archived_at: string | null;
+  archived_by_user_id: string | null;
+  archive_reason: string | null;
   created_by_user_id: string | null;
   updated_by_user_id: string | null;
   deleted_at: string | null;
@@ -55,6 +62,34 @@ export type AssignmentRow = {
   updated_at: string;
 };
 
+export type NotificationRow = {
+  id: string;
+  fleet_id: string;
+  recipient_user_id: string;
+  event_type: NotificationEventType;
+  entity_type: string;
+  entity_id: string | null;
+  payload: SharedJson;
+  is_read: boolean;
+  read_at: string | null;
+  dedupe_key: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+};
+
+export type AuditRow = {
+  id: string;
+  fleet_id: string;
+  actor_user_id: string | null;
+  actor_membership_id: string | null;
+  event_type: string;
+  entity_type: string;
+  entity_id: string | null;
+  payload: SharedJson;
+  idempotency_key: string | null;
+  created_at: string;
+};
+
 export function mapProfile(row: ProfileRow): Profile {
   return {
     id: row.id,
@@ -74,6 +109,9 @@ export function mapVehicle(row: VehicleRow): Vehicle {
     status: row.status,
     blockedUntil: row.blocked_until,
     blockedReason: row.blocked_reason,
+    archivedAt: row.archived_at,
+    archivedByUserId: row.archived_by_user_id,
+    archiveReason: row.archive_reason,
     createdByUserId: row.created_by_user_id,
     updatedByUserId: row.updated_by_user_id,
     deletedAt: row.deleted_at,
@@ -105,6 +143,38 @@ export function mapAssignment(row: AssignmentRow): VehicleAssignment {
     cancelledReason: row.cancelled_reason,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function mapNotification(row: NotificationRow): FleetNotification {
+  return {
+    id: row.id,
+    fleetId: row.fleet_id,
+    recipientUserId: row.recipient_user_id,
+    eventType: row.event_type,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    payload: row.payload,
+    isRead: row.is_read,
+    readAt: row.read_at,
+    dedupeKey: row.dedupe_key,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function mapAudit(row: AuditRow): FleetAuditLog {
+  return {
+    id: row.id,
+    fleetId: row.fleet_id,
+    actorUserId: row.actor_user_id,
+    actorMembershipId: row.actor_membership_id,
+    eventType: row.event_type,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    payload: row.payload,
+    idempotencyKey: row.idempotency_key,
+    createdAt: row.created_at,
   };
 }
 
