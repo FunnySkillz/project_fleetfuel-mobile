@@ -1,78 +1,52 @@
-# FleetFuel Mobile (MVP)
+# FleetFuel Mobile
 
-FleetFuel is a mobile-first, local-first/offline-first app for tracking:
+FleetFuel is a mobile-first fleet operations app with two isolated modes:
 
-- vehicles
-- trips
-- fuel entries
-- receipt attachments (photo/image/pdf)
-- logs export
-- backup/restore
+- `Local` mode: offline/local-first SQLite MVP flows
+- `Shared Fleet` mode: cloud-backed Supabase multi-user workflows
 
-MVP is intentionally backend-free. No sync, no roles, no company/admin workflows.
+Local mode and Shared Fleet mode are intentionally separated in UX, routing, and data access.
 
-Shared Fleet Sprint 1 is now available as an isolated cloud-backed mode. Local MVP flows stay fully intact and unchanged in Local mode.
+## Current product scope
 
-## Current MVP scope
+### Local mode (unchanged MVP)
 
-Implemented core navigation and workflows:
+- Vehicles, trips, fuel entries, receipts
+- Logs export (PDF)
+- Backup/restore
+- Local SQLite migrations and health checks
 
-- Root tabs: `Dashboard | Vehicles | Add | Logs | Settings`
-- Add actions: `Add Trip`, `Add Fuel`, `Add Vehicle`
-- Vehicle insight screen with KPI summaries and recent trips
-- Logs export workbench with filters (vehicle/date/usage/fuel-type)
-- PDF export generation from local data
-- Settings:
-  - Appearance (`system | light | dark`)
-  - Language (`en | de`)
-  - Backup and Restore
+### Shared Fleet mode (Sprint 1 + Sprint 2 + Sprint 3)
 
-Data safety/hardening implemented:
-
-- SQLite local persistence with migrations
-- Startup DB health gate + recovery path
-- Backup format: ZIP + manifest + payloads (DB/receipts/preferences)
-- Restore strategy: preflight validation + full replace
-- Receipt orphan scan and manual cleanup action
+- Auth/session: Supabase email + password
+- Fleets and memberships with role-aware access (`owner`, `admin`, `driver`)
+- Invitation lifecycle (create, accept, revoke, expire)
+- Vehicle assignment lifecycle and status enforcement
+- Vehicle block/unblock logic
+- Vehicle archive/unarchive logic
+- Membership role update + deactivation flows
+- In-app notification feed with read/unread states
+- Audit log visibility for owner/admin
+- Operations reporting (assignment/status/membership/audit summary)
+- Expired block normalization workflow (manual endpoint + DB cron scheduling path)
 
 ## Tech stack
 
 - React Native + Expo + Expo Router
-- TypeScript
-- NativeWind/Tailwind utilities + shared shadcn-style UI primitives
-- Expo SQLite for local persistence
-- Supabase (Shared Fleet mode only)
-- Vitest (logic-first test baseline)
+- TypeScript (strict)
+- NativeWind + shared UI primitives
+- Expo SQLite (Local mode)
+- Supabase (Shared Fleet mode)
+- Vitest
 
-## Shared Fleet mode (Sprint 1)
+## Required environment variables
 
-- App mode switch: `Settings -> App Mode`
-- Shared mode scope:
-  - Supabase Auth (email + password)
-  - Fleet bootstrap
-  - Membership listing
-  - Invitation create / revoke / accept
-- Local and Shared modes are intentionally isolated in this phase (no migration).
-
-### Required env vars for Shared mode
+Shared Fleet mode requires:
 
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 
-Supabase server assets are in `supabase/`:
-
-- migrations: `supabase/migrations`
-- edge functions: `supabase/functions`
-- DB policy tests: `supabase/tests`
-
-## Project structure
-
-- App routes: `src/app`
-- Data layer: `src/data`
-- UI primitives: `src/components/ui`
-- Services: `src/services`
-- Preferences/i18n: `src/preferences`, `src/providers`, `src/i18n`
-- Product/engineering docs: `docs/`
+Supabase edge functions also require standard Supabase runtime env vars when deployed/served (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`).
 
 ## Getting started
 
@@ -82,13 +56,13 @@ Supabase server assets are in `supabase/`:
 npm install
 ```
 
-2. Start the app
+2. Start app
 
 ```bash
 npm run start
 ```
 
-Useful launch commands:
+Useful platform commands:
 
 ```bash
 npm run ios
@@ -96,38 +70,57 @@ npm run android
 npm run web
 ```
 
-## Quality commands
+## Shared Fleet backend setup (Supabase)
+
+Project assets:
+
+- migrations: `supabase/migrations`
+- edge functions: `supabase/functions`
+- policy/DB tests: `supabase/tests`
+
+Typical local workflow:
+
+```bash
+npx supabase start
+npx supabase db reset
+npx supabase db test
+```
+
+If you need local function serving:
+
+```bash
+npx supabase functions serve --env-file supabase/.env.local
+```
+
+## Validation commands
 
 ```bash
 npm run lint
-npm test
 npx tsc --noEmit
-npx expo export --platform web --clear
+npm test
+npx supabase db test
 ```
 
-## Scripts
+Note: `npx supabase db test` needs a running local Supabase stack (`supabase start`).
 
-- `npm run start` - start Expo
-- `npm run ios` - run iOS target
-- `npm run android` - run Android target
-- `npm run web` - run web target
-- `npm run lint` - run Expo ESLint
-- `npm test` - run Vitest suite
-- `npm run reset-project` - reset scaffold utility from template
+## Project structure
 
-## Platform notes
+- routes: `src/app`
+- local data/domain: `src/data`, `src/services`
+- shared fleet cloud slice: `src/shared-fleet`
+- UI primitives: `src/components/ui`
+- docs: `docs/`
 
-- Primary target is iOS/Android (mobile-first).
-- SQLite-backed data features are designed for mobile runtime.
-- Web export build is available for CI/static checks, but local DB features are not intended as a full web product in MVP.
+## Important architecture rules
 
-## Documentation
+- Local mode must remain stable and isolated from Shared mode.
+- Shared business-critical workflows run server-side (RPC/edge functions), not client-only.
+- Assignment history is the source of truth for who drove which vehicle and when.
+- Shared lifecycle records are retained; archive/deactivate is preferred over destructive delete.
 
-Key internal docs:
+## Known deferred items
 
-- `docs/product/mvp-definition.md`
-- `docs/product/shared-fleet-sprint1.md`
-- `docs/design/navigation-layout-qa.md`
-- `docs/release/production-readiness.md`
-- `docs/project/lessons-learned-v1.md`
-- `docs/design/design-system-direction.md`
+- Push notifications / email digests
+- Rich export formats for reporting
+- Offline-aware shared sync
+- Enterprise-grade fleet controls (advanced policy/admin tooling)
