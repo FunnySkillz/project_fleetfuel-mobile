@@ -20,6 +20,7 @@ import { SharedFleetError } from '@/shared-fleet/errors';
 import { useSharedFleet } from '@/shared-fleet/hooks/use-shared-fleet';
 import {
   approveAssignment,
+  archiveVehicle,
   blockVehicle,
   cancelAssignment,
   directAssignVehicle,
@@ -30,6 +31,7 @@ import {
   loadFleetMembers,
   loadFleetVehiclesWithAccess,
   rejectAssignment,
+  unarchiveVehicle,
   requestAssignment,
   unblockVehicle,
 } from '@/shared-fleet/services';
@@ -92,6 +94,7 @@ export default function SharedVehicleDetailScreen() {
   const [decisionReason, setDecisionReason] = useState('');
   const [blockUntilInput, setBlockUntilInput] = useState('');
   const [blockReason, setBlockReason] = useState('');
+  const [archiveReason, setArchiveReason] = useState('');
 
   const isManager = activeFleet?.role === 'owner' || activeFleet?.role === 'admin';
   const isDriver = activeFleet?.role === 'driver';
@@ -109,7 +112,7 @@ export default function SharedVehicleDetailScreen() {
 
     try {
       const [vehicles, active, allPending, assignmentTimeline, members] = await Promise.all([
-        loadFleetVehiclesWithAccess({ fleetId: activeFleetId }),
+        loadFleetVehiclesWithAccess({ fleetId: activeFleetId, includeArchived: true }),
         getVehicleCurrentAssignment({ fleetId: activeFleetId, vehicleId }),
         getFleetPendingAssignmentRequests({ fleetId: activeFleetId }),
         getVehicleTimeline({ fleetId: activeFleetId, vehicleId }),
@@ -153,6 +156,7 @@ export default function SharedVehicleDetailScreen() {
     activeFleetId &&
       vehicle &&
       isDriver &&
+      !vehicle.archivedAt &&
       vehicle.effectiveStatus !== 'blocked' &&
       !currentAssignment &&
       !ownPending,
@@ -164,6 +168,7 @@ export default function SharedVehicleDetailScreen() {
       currentAssignment.driverUserId === userId &&
       currentAssignment.status === 'active',
   );
+  const isArchived = Boolean(vehicle?.archivedAt);
 
   const runAction = async (action: () => Promise<void>) => {
     setBusyAction(true);
@@ -222,6 +227,14 @@ export default function SharedVehicleDetailScreen() {
               ) : null}
               {vehicle.blockedReason ? (
                 <AppText variant="caption" color="secondary">Block reason: {vehicle.blockedReason}</AppText>
+              ) : null}
+              {vehicle.archivedAt ? (
+                <AppText variant="caption" color="warning">
+                  Archived at: {new Date(vehicle.archivedAt).toLocaleString()}
+                </AppText>
+              ) : null}
+              {vehicle.archiveReason ? (
+                <AppText variant="caption" color="secondary">Archive reason: {vehicle.archiveReason}</AppText>
               ) : null}
             </Card>
           ) : null}
@@ -323,7 +336,7 @@ export default function SharedVehicleDetailScreen() {
 
               <Button
                 label="Direct Assign"
-                disabled={!selectedDriverMembershipId || busyAction || vehicle?.effectiveStatus === 'blocked'}
+                disabled={!selectedDriverMembershipId || busyAction || vehicle?.effectiveStatus === 'blocked' || isArchived}
                 loading={busyAction}
                 loadingLabel="Assigning..."
                 onPress={() => {
@@ -361,7 +374,7 @@ export default function SharedVehicleDetailScreen() {
               <Button
                 label="Block Vehicle"
                 variant="destructive"
-                disabled={busyAction || !parseBlockedUntil(blockUntilInput)}
+                disabled={busyAction || !parseBlockedUntil(blockUntilInput) || isArchived}
                 loading={busyAction}
                 loadingLabel="Blocking..."
                 onPress={() => {
@@ -384,7 +397,7 @@ export default function SharedVehicleDetailScreen() {
               <Button
                 label="Unblock Vehicle"
                 variant="secondary"
-                disabled={busyAction || vehicle?.effectiveStatus !== 'blocked'}
+                disabled={busyAction || vehicle?.effectiveStatus !== 'blocked' || isArchived}
                 loading={busyAction}
                 loadingLabel="Unblocking..."
                 onPress={() => {
@@ -393,6 +406,47 @@ export default function SharedVehicleDetailScreen() {
                   });
                 }}
               />
+
+              <FormField label="Archive reason">
+                <TextArea
+                  value={archiveReason}
+                  onChangeText={setArchiveReason}
+                  placeholder="Out of service"
+                />
+              </FormField>
+
+              {!isArchived ? (
+                <Button
+                  label="Archive Vehicle"
+                  variant="secondary"
+                  tone="warning"
+                  disabled={busyAction}
+                  loading={busyAction}
+                  loadingLabel="Archiving..."
+                  onPress={() => {
+                    void runAction(async () => {
+                      await archiveVehicle({
+                        fleetId: activeFleetId,
+                        vehicleId,
+                        archiveReason: archiveReason || undefined,
+                      });
+                    });
+                  }}
+                />
+              ) : (
+                <Button
+                  label="Unarchive Vehicle"
+                  variant="secondary"
+                  disabled={busyAction}
+                  loading={busyAction}
+                  loadingLabel="Restoring..."
+                  onPress={() => {
+                    void runAction(async () => {
+                      await unarchiveVehicle({ fleetId: activeFleetId, vehicleId });
+                    });
+                  }}
+                />
+              )}
             </Card>
           ) : null}
 
