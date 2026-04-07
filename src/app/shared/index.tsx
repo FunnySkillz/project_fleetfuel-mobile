@@ -9,7 +9,16 @@ import { Spacing } from '@/constants/theme';
 import { useAppPreferences } from '@/hooks/use-app-preferences';
 import { SharedFleetError } from '@/shared-fleet/errors';
 import { useSharedFleet } from '@/shared-fleet/hooks/use-shared-fleet';
-import { countFleetDrivers, createFleet } from '@/shared-fleet/services';
+import { createFleet, loadFleetAssignmentMetrics } from '@/shared-fleet/services';
+import type { FleetAssignmentMetrics } from '@/shared-fleet/types';
+
+const EMPTY_METRICS: FleetAssignmentMetrics = {
+  activeDrivers: 0,
+  vehiclesInUse: 0,
+  availableVehicles: 0,
+  blockedVehicles: 0,
+  pendingRequests: 0,
+};
 
 export default function SharedHomeScreen() {
   const router = useRouter();
@@ -28,8 +37,8 @@ export default function SharedHomeScreen() {
   const [newFleetName, setNewFleetName] = useState('');
   const [creatingFleet, setCreatingFleet] = useState(false);
   const [fleetError, setFleetError] = useState<string | null>(null);
-  const [driversCount, setDriversCount] = useState(0);
-  const [driversBusy, setDriversBusy] = useState(false);
+  const [metrics, setMetrics] = useState<FleetAssignmentMetrics>(EMPTY_METRICS);
+  const [metricsBusy, setMetricsBusy] = useState(false);
 
   const fleetOptions = useMemo(
     () => fleets.map((membership) => ({ value: membership.fleetId, label: membership.fleet.name })),
@@ -38,19 +47,19 @@ export default function SharedHomeScreen() {
 
   useEffect(() => {
     if (!activeFleetId) {
-      setDriversCount(0);
+      setMetrics(EMPTY_METRICS);
       return;
     }
 
     void (async () => {
-      setDriversBusy(true);
+      setMetricsBusy(true);
       try {
-        const count = await countFleetDrivers({ fleetId: activeFleetId });
-        setDriversCount(count);
+        const loaded = await loadFleetAssignmentMetrics({ fleetId: activeFleetId });
+        setMetrics(loaded);
       } catch {
-        setDriversCount(0);
+        setMetrics(EMPTY_METRICS);
       } finally {
-        setDriversBusy(false);
+        setMetricsBusy(false);
       }
     })();
   }, [activeFleetId]);
@@ -75,13 +84,15 @@ export default function SharedHomeScreen() {
     }
   };
 
+  const metricLabel = (value: number) => (metricsBusy ? '...' : String(value));
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <SectionHeader
             title="Shared Fleet"
-            description="Cloud-backed fleet workspace with members and invitations."
+            description="Cloud-backed fleet workspace with assignment truth and role-aware controls."
           />
 
           {dataBusy ? (
@@ -136,11 +147,28 @@ export default function SharedHomeScreen() {
                   />
                 </FormField>
 
+                <View style={styles.metricGrid}>
+                  <Card className="gap-1" variant="outline">
+                    <AppText variant="caption" color="secondary">Active drivers</AppText>
+                    <AppText variant="title" className="text-xl">{metricLabel(metrics.activeDrivers)}</AppText>
+                  </Card>
+                  <Card className="gap-1" variant="outline">
+                    <AppText variant="caption" color="secondary">Vehicles in use</AppText>
+                    <AppText variant="title" className="text-xl">{metricLabel(metrics.vehiclesInUse)}</AppText>
+                  </Card>
+                  <Card className="gap-1" variant="outline">
+                    <AppText variant="caption" color="secondary">Available vehicles</AppText>
+                    <AppText variant="title" className="text-xl">{metricLabel(metrics.availableVehicles)}</AppText>
+                  </Card>
+                  <Card className="gap-1" variant="outline">
+                    <AppText variant="caption" color="secondary">Blocked vehicles</AppText>
+                    <AppText variant="title" className="text-xl">{metricLabel(metrics.blockedVehicles)}</AppText>
+                  </Card>
+                </View>
+
                 <Card className="gap-1" variant="outline">
-                  <AppText variant="caption" color="secondary">Drivers under you</AppText>
-                  <AppText variant="title" className="text-2xl">
-                    {driversBusy ? '...' : String(driversCount)}
-                  </AppText>
+                  <AppText variant="caption" color="secondary">Pending assignment requests</AppText>
+                  <AppText variant="title" className="text-2xl">{metricLabel(metrics.pendingRequests)}</AppText>
                   <AppText variant="caption" color="secondary">
                     {activeFleet ? `Fleet: ${activeFleet.fleet.name}` : 'No fleet selected'}
                   </AppText>
@@ -148,6 +176,27 @@ export default function SharedHomeScreen() {
               </Card>
 
               <Card className="gap-2">
+                <ActionRow
+                  label="Vehicles"
+                  description="Open vehicle access, statuses, and assignment controls."
+                  onPress={() => {
+                    router.push('/shared/vehicles' as Href);
+                  }}
+                />
+                <ActionRow
+                  label="Pending Requests"
+                  description="Approve or reject assignment requests for your active fleet."
+                  onPress={() => {
+                    router.push('/shared/pending-requests' as Href);
+                  }}
+                />
+                <ActionRow
+                  label="Assignment History"
+                  description="Review assignment timeline records across this fleet."
+                  onPress={() => {
+                    router.push('/shared/history' as Href);
+                  }}
+                />
                 <ActionRow
                   label="Members"
                   description="View current fleet members and role assignments."
@@ -204,5 +253,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
   },
 });
