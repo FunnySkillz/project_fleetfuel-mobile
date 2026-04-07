@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,22 +32,19 @@ export default function SharedInvitationsScreen() {
 
   const canCreateInvite = useMemo(() => inviteEmail.trim().length > 0 && !!activeFleetId, [activeFleetId, inviteEmail]);
 
-  const loadInvitations = useMemo(
-    () => async (fleetId: string) => {
-      setStatus('loading');
-      setErrorMessage(null);
+  const loadInvitations = useCallback(async (fleetId: string) => {
+    setStatus('loading');
+    setErrorMessage(null);
 
-      try {
-        const data = await loadFleetInvitations({ fleetId });
-        setInvitations(data);
-        setStatus('ready');
-      } catch (error) {
-        setStatus('error');
-        setErrorMessage(error instanceof Error ? error.message : 'Could not load invitations.');
-      }
-    },
-    [],
-  );
+    try {
+      const data = await loadFleetInvitations({ fleetId });
+      setInvitations(data);
+      setStatus('ready');
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Could not load invitations.');
+    }
+  }, []);
 
   useEffect(() => {
     if (!activeFleetId) {
@@ -111,6 +108,7 @@ export default function SharedInvitationsScreen() {
           data={invitations}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <View style={styles.headerSection}>
               <SectionHeader
