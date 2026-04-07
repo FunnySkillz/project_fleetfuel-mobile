@@ -1,4 +1,11 @@
-export { createFleet, loadCurrentUserFleets, loadFleetMembers, countFleetDrivers } from './fleet-service';
+export {
+  createFleet,
+  loadCurrentUserFleets,
+  loadFleetMembers,
+  countFleetDrivers,
+  updateFleetMembershipRole,
+  deactivateFleetMembership,
+} from './fleet-service';
 export { createInvite, acceptInvite, revokeInvite, loadFleetInvitations } from './invites-service';
 export { signInSharedUser, signUpSharedUser, signOutSharedUser } from './auth-service';
 export {
@@ -15,4 +22,18 @@ export {
   getVehicleTimeline,
   getFleetAssignmentHistory,
 } from './assignment-service';
-export { createSharedVehicle, loadFleetVehiclesWithAccess, loadFleetAssignmentMetrics } from './vehicle-access-service';
+export {
+  createSharedVehicle,
+  loadFleetVehiclesWithAccess,
+  loadFleetAssignmentMetrics,
+  archiveVehicle,
+  unarchiveVehicle,
+} from './vehicle-access-service';
+export {
+  getFleetNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  countFleetUnreadNotifications,
+} from './notification-service';
+export { getFleetAuditLog } from './audit-service';
+export { getFleetOperationalReport, runExpiredBlockNormalization } from './reporting-service';
