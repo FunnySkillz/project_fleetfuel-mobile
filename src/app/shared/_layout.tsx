@@ -68,6 +68,10 @@ function SharedLayoutInner() {
       <Stack.Screen name="auth/sign-up" options={{ title: 'Sign Up' }} />
       <Stack.Screen name="members" options={{ title: 'Members' }} />
       <Stack.Screen name="invitations" options={{ title: 'Invitations' }} />
+      <Stack.Screen name="vehicles/index" options={{ title: 'Vehicles' }} />
+      <Stack.Screen name="vehicles/[vehicleId]" options={{ title: 'Vehicle Access' }} />
+      <Stack.Screen name="pending-requests" options={{ title: 'Pending Requests' }} />
+      <Stack.Screen name="history" options={{ title: 'Assignment History' }} />
       <Stack.Screen name="accept-invite" options={{ title: 'Accept Invitation' }} />
     </Stack>
   );
