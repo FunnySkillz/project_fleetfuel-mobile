@@ -2,6 +2,9 @@ import type { Session } from '@supabase/supabase-js';
 
 import type {
   AssignmentEndReason,
+  FleetAuditLog,
+  FleetNotification,
+  FleetOperationalReport,
   Fleet,
   FleetAssignmentMetrics,
   FleetInvitation,
@@ -39,6 +42,8 @@ export interface FleetRepo {
   loadCurrentUserFleets(): Promise<FleetMembershipWithFleet[]>;
   loadFleetMembers(fleetId: string): Promise<FleetMemberProfile[]>;
   countDrivers(fleetId: string): Promise<number>;
+  updateMembershipRole(input: { membershipId: string; role: 'admin' | 'driver' }): Promise<FleetMemberProfile>;
+  deactivateMembership(input: { membershipId: string; reason?: string }): Promise<FleetMemberProfile>;
 }
 
 export interface InvitesRepo {
@@ -50,8 +55,10 @@ export interface InvitesRepo {
 
 export interface VehicleAccessRepo {
   createVehicle(input: { fleetId: string; name: string; plate: string }): Promise<Vehicle>;
-  listFleetVehicleAccess(fleetId: string): Promise<VehicleWithEffectiveStatus[]>;
+  listFleetVehicleAccess(input: { fleetId: string; includeArchived?: boolean }): Promise<VehicleWithEffectiveStatus[]>;
   getFleetAssignmentMetrics(fleetId: string): Promise<FleetAssignmentMetrics>;
+  archiveVehicle(input: { fleetId: string; vehicleId: string; archiveReason?: string }): Promise<Vehicle>;
+  unarchiveVehicle(input: { fleetId: string; vehicleId: string }): Promise<Vehicle>;
 }
 
 export interface AssignmentRepo {
@@ -67,4 +74,26 @@ export interface AssignmentRepo {
   getFleetPendingAssignmentRequests(input: { fleetId: string }): Promise<VehicleAssignmentWithContext[]>;
   getVehicleTimeline(input: { fleetId: string; vehicleId: string }): Promise<VehicleAssignmentWithContext[]>;
   getFleetAssignmentHistory(input: { fleetId: string; limit?: number }): Promise<VehicleAssignmentWithContext[]>;
+}
+
+export interface NotificationRepo {
+  getFleetNotifications(input: { fleetId: string; limit?: number }): Promise<FleetNotification[]>;
+  markNotificationRead(input: { notificationId: string }): Promise<void>;
+  markAllNotificationsRead(input: { fleetId: string }): Promise<number>;
+  countUnread(input: { fleetId: string }): Promise<number>;
+}
+
+export interface AuditRepo {
+  getFleetAuditLog(input: {
+    fleetId: string;
+    eventType?: string | null;
+    from?: string | null;
+    to?: string | null;
+    limit?: number;
+  }): Promise<FleetAuditLog[]>;
+}
+
+export interface ReportingRepo {
+  getFleetOperationalReport(input: { fleetId: string }): Promise<FleetOperationalReport>;
+  runExpiredBlockNormalization(input: { fleetId: string; emitNotifications?: boolean }): Promise<number>;
 }
