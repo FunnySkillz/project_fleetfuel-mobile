@@ -82,6 +82,7 @@ export default function SharedMembersScreen() {
           data={members}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <View style={styles.headerSection}>
               <SectionHeader
