@@ -25,6 +25,8 @@ function mapCodeToError(code: string | undefined, status: number, message: strin
       return new SharedFleetError('shared_not_authorized', message, { status });
     case 'vehicle_blocked':
       return new SharedFleetError('shared_vehicle_blocked', message, { status });
+    case 'vehicle_archived':
+      return new SharedFleetError('shared_vehicle_archived', message, { status });
     case 'assignment_conflict':
       return new SharedFleetError('shared_assignment_conflict', message, { status });
     case 'assignment_not_found':
