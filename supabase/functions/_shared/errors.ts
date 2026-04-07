@@ -33,6 +33,10 @@ export function mapRpcErrorMessage(rawMessage: string): { code: string; message:
     return { code: 'vehicle_blocked', message: 'Vehicle is currently blocked and cannot be activated.', status: 409 };
   }
 
+  if (normalized.includes('vehicle_archived')) {
+    return { code: 'vehicle_archived', message: 'Vehicle is archived and unavailable for active operations.', status: 409 };
+  }
+
   if (normalized.includes('assignment_conflict')) {
     return { code: 'assignment_conflict', message: 'Vehicle already has an active assignment.', status: 409 };
   }
