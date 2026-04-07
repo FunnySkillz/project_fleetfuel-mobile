@@ -9,7 +9,11 @@ import { Spacing } from '@/constants/theme';
 import { useAppPreferences } from '@/hooks/use-app-preferences';
 import { SharedFleetError } from '@/shared-fleet/errors';
 import { useSharedFleet } from '@/shared-fleet/hooks/use-shared-fleet';
-import { createFleet, loadFleetAssignmentMetrics } from '@/shared-fleet/services';
+import {
+  countFleetUnreadNotifications,
+  createFleet,
+  loadFleetAssignmentMetrics,
+} from '@/shared-fleet/services';
 import type { FleetAssignmentMetrics } from '@/shared-fleet/types';
 
 const EMPTY_METRICS: FleetAssignmentMetrics = {
@@ -39,6 +43,7 @@ export default function SharedHomeScreen() {
   const [fleetError, setFleetError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<FleetAssignmentMetrics>(EMPTY_METRICS);
   const [metricsBusy, setMetricsBusy] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const fleetOptions = useMemo(
     () => fleets.map((membership) => ({ value: membership.fleetId, label: membership.fleet.name })),
@@ -48,16 +53,22 @@ export default function SharedHomeScreen() {
   useEffect(() => {
     if (!activeFleetId) {
       setMetrics(EMPTY_METRICS);
+      setUnreadNotifications(0);
       return;
     }
 
     void (async () => {
       setMetricsBusy(true);
       try {
-        const loaded = await loadFleetAssignmentMetrics({ fleetId: activeFleetId });
-        setMetrics(loaded);
+        const [loadedMetrics, unreadCount] = await Promise.all([
+          loadFleetAssignmentMetrics({ fleetId: activeFleetId }),
+          countFleetUnreadNotifications({ fleetId: activeFleetId }),
+        ]);
+        setMetrics(loadedMetrics);
+        setUnreadNotifications(unreadCount);
       } catch {
         setMetrics(EMPTY_METRICS);
+        setUnreadNotifications(0);
       } finally {
         setMetricsBusy(false);
       }
@@ -85,6 +96,7 @@ export default function SharedHomeScreen() {
   };
 
   const metricLabel = (value: number) => (metricsBusy ? '...' : String(value));
+  const isManager = activeFleet?.role === 'owner' || activeFleet?.role === 'admin';
 
   return (
     <ThemedView style={styles.container}>
@@ -211,6 +223,37 @@ export default function SharedHomeScreen() {
                     router.push('/shared/invitations' as Href);
                   }}
                 />
+                <ActionRow
+                  label="Notifications"
+                  description={
+                    metricsBusy
+                      ? 'Loading notification state...'
+                      : unreadNotifications > 0
+                        ? `${unreadNotifications} unread notification${unreadNotifications === 1 ? '' : 's'}`
+                        : 'No unread notifications'
+                  }
+                  onPress={() => {
+                    router.push('/shared/notifications' as Href);
+                  }}
+                />
+                {isManager ? (
+                  <>
+                    <ActionRow
+                      label="Operations"
+                      description="Fleet operations report, blocked normalization, and admin overview."
+                      onPress={() => {
+                        router.push('/shared/operations' as Href);
+                      }}
+                    />
+                    <ActionRow
+                      label="Audit Log"
+                      description="Review secure fleet audit events and change history."
+                      onPress={() => {
+                        router.push('/shared/audit-log' as Href);
+                      }}
+                    />
+                  </>
+                ) : null}
                 <ActionRow
                   label="Sign out"
                   description="End this shared session on the current device."
