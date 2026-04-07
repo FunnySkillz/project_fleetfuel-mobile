@@ -21,6 +21,9 @@ const VEHICLE_COLUMNS = [
   'status',
   'blocked_until',
   'blocked_reason',
+  'archived_at',
+  'archived_by_user_id',
+  'archive_reason',
   'created_by_user_id',
   'updated_by_user_id',
   'deleted_at',
@@ -56,6 +59,10 @@ type CreateVehicleResponse = {
   vehicle: VehicleRow;
 };
 
+type VehicleMutationResponse = {
+  vehicle: VehicleRow;
+};
+
 function requireId(value: string, fieldName: string) {
   const normalized = value.trim();
   if (!normalized) {
@@ -69,15 +76,22 @@ function asRows<TRow>(data: unknown): TRow[] {
   return ((data ?? []) as unknown) as TRow[];
 }
 
-async function loadFleetVehicleAssignments(fleetId: string) {
+async function loadFleetVehicleAssignments(input: { fleetId: string; includeArchived: boolean }) {
+  const { fleetId, includeArchived } = input;
   const supabase = getSharedSupabaseClient();
+  let vehiclesQuery = supabase
+    .from('vehicles')
+    .select(VEHICLE_COLUMNS)
+    .eq('fleet_id', fleetId)
+    .is('deleted_at', null)
+    .order('name', { ascending: true });
+
+  if (!includeArchived) {
+    vehiclesQuery = vehiclesQuery.is('archived_at', null);
+  }
+
   const [vehiclesResult, activeAssignmentsResult, pendingCountsResult] = await Promise.all([
-    supabase
-      .from('vehicles')
-      .select(VEHICLE_COLUMNS)
-      .eq('fleet_id', fleetId)
-      .is('deleted_at', null)
-      .order('name', { ascending: true }),
+    vehiclesQuery,
     supabase
       .from('vehicle_assignments')
       .select(ASSIGNMENT_COLUMNS)
@@ -150,9 +164,13 @@ export const vehicleAccessRepo: VehicleAccessRepo = {
     return mapVehicle(response.vehicle);
   },
 
-  async listFleetVehicleAccess(fleetId) {
-    const normalizedFleetId = requireId(fleetId, 'Fleet id');
-    const { vehicles, activeAssignments, pendingCounts } = await loadFleetVehicleAssignments(normalizedFleetId);
+  async listFleetVehicleAccess(input) {
+    const normalizedFleetId = requireId(input.fleetId, 'Fleet id');
+    const includeArchived = input.includeArchived ?? false;
+    const { vehicles, activeAssignments, pendingCounts } = await loadFleetVehicleAssignments({
+      fleetId: normalizedFleetId,
+      includeArchived,
+    });
 
     const activeAssignmentMap = new Map(activeAssignments.map((assignment) => [assignment.vehicleId, assignment]));
 
@@ -179,7 +197,10 @@ export const vehicleAccessRepo: VehicleAccessRepo = {
 
   async getFleetAssignmentMetrics(fleetId) {
     const normalizedFleetId = requireId(fleetId, 'Fleet id');
-    const { vehicles, activeAssignments, pendingCounts } = await loadFleetVehicleAssignments(normalizedFleetId);
+    const { vehicles, activeAssignments, pendingCounts } = await loadFleetVehicleAssignments({
+      fleetId: normalizedFleetId,
+      includeArchived: false,
+    });
     const activeAssignmentMap = new Map(activeAssignments.map((assignment) => [assignment.vehicleId, assignment]));
     const vehicleAccessRows = vehicles.map((vehicle): VehicleWithEffectiveStatus => {
       const activeAssignment = activeAssignmentMap.get(vehicle.id) ?? null;
@@ -202,5 +223,30 @@ export const vehicleAccessRepo: VehicleAccessRepo = {
 
     const metrics: FleetAssignmentMetrics = calculateFleetAssignmentMetrics(vehicleAccessRows);
     return metrics;
+  },
+
+  async archiveVehicle(input) {
+    const fleetId = requireId(input.fleetId, 'Fleet id');
+    const vehicleId = requireId(input.vehicleId, 'Vehicle id');
+    const archiveReason = input.archiveReason?.trim() ?? '';
+
+    const response = await invokeSharedFunction<
+      VehicleMutationResponse,
+      { fleetId: string; vehicleId: string; archiveReason?: string }
+    >('archive-vehicle', archiveReason ? { fleetId, vehicleId, archiveReason } : { fleetId, vehicleId });
+
+    return mapVehicle(response.vehicle);
+  },
+
+  async unarchiveVehicle(input) {
+    const fleetId = requireId(input.fleetId, 'Fleet id');
+    const vehicleId = requireId(input.vehicleId, 'Vehicle id');
+
+    const response = await invokeSharedFunction<VehicleMutationResponse, { fleetId: string; vehicleId: string }>('unarchive-vehicle', {
+      fleetId,
+      vehicleId,
+    });
+
+    return mapVehicle(response.vehicle);
   },
 };
