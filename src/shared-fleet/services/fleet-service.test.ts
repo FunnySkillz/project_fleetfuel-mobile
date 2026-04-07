@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   countFleetDrivers,
   createFleet,
+  deactivateFleetMembership,
   loadCurrentUserFleets,
   loadFleetMembers,
+  updateFleetMembershipRole,
 } from '@/shared-fleet/services/fleet-service';
 
 const { fleetRepoMock } = vi.hoisted(() => ({
@@ -13,6 +15,8 @@ const { fleetRepoMock } = vi.hoisted(() => ({
     loadCurrentUserFleets: vi.fn(),
     loadFleetMembers: vi.fn(),
     countDrivers: vi.fn(),
+    updateMembershipRole: vi.fn(),
+    deactivateMembership: vi.fn(),
   },
 }));
 
@@ -58,5 +62,18 @@ describe('fleet service', () => {
 
     expect(count).toBe(5);
     expect(fleetRepoMock.countDrivers).toHaveBeenCalledWith('fleet-1');
+  });
+
+  it('updates and deactivates memberships via fleet admin service methods', async () => {
+    fleetRepoMock.updateMembershipRole.mockResolvedValueOnce({ id: 'member-1', role: 'admin' });
+    fleetRepoMock.deactivateMembership.mockResolvedValueOnce({ id: 'member-1', endedAt: '2026-04-07T12:00:00.000Z' });
+
+    await expect(updateFleetMembershipRole({ membershipId: 'member-1', role: 'admin' })).resolves.toMatchObject({
+      id: 'member-1',
+      role: 'admin',
+    });
+    await expect(
+      deactivateFleetMembership({ membershipId: 'member-1', reason: 'Policy violation' }),
+    ).resolves.toMatchObject({ id: 'member-1' });
   });
 });
