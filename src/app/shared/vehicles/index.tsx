@@ -25,7 +25,8 @@ function statusLabel(vehicle: VehicleWithEffectiveStatus) {
 
 function formatMeta(vehicle: VehicleWithEffectiveStatus) {
   const pending = vehicle.pendingRequestCount > 0 ? ` | pending ${vehicle.pendingRequestCount}` : '';
-  return `${statusLabel(vehicle)}${pending}`;
+  const archived = vehicle.archivedAt ? ' | archived' : '';
+  return `${statusLabel(vehicle)}${pending}${archived}`;
 }
 
 function formatSubtitle(vehicle: VehicleWithEffectiveStatus) {
@@ -45,6 +46,7 @@ export default function SharedVehiclesScreen() {
   const [vehicleName, setVehicleName] = useState('');
   const [vehiclePlate, setVehiclePlate] = useState('');
   const [createBusy, setCreateBusy] = useState(false);
+  const [includeArchived, setIncludeArchived] = useState(false);
 
   const isManager = useMemo(() => activeFleet?.role === 'owner' || activeFleet?.role === 'admin', [activeFleet?.role]);
 
@@ -59,14 +61,14 @@ export default function SharedVehiclesScreen() {
     setErrorMessage(null);
 
     try {
-      const loaded = await loadFleetVehiclesWithAccess({ fleetId: activeFleetId });
+      const loaded = await loadFleetVehiclesWithAccess({ fleetId: activeFleetId, includeArchived });
       setVehicles(loaded);
       setStatus('ready');
     } catch (error) {
       setStatus('error');
       setErrorMessage(error instanceof Error ? error.message : 'Could not load vehicles.');
     }
-  }, [activeFleetId]);
+  }, [activeFleetId, includeArchived]);
 
   useEffect(() => {
     void loadVehicles();
@@ -131,6 +133,16 @@ export default function SharedVehiclesScreen() {
                     router.push('/shared/history' as Href);
                   }}
                 />
+                {isManager ? (
+                  <Button
+                    label={includeArchived ? 'Hide Archived Vehicles' : 'Show Archived Vehicles'}
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => {
+                      setIncludeArchived((previous) => !previous);
+                    }}
+                  />
+                ) : null}
               </Card>
 
               {isManager ? (
