@@ -16,3 +16,17 @@ export async function loadFleetMembers(input: { fleetId: string }): Promise<Flee
 export async function countFleetDrivers(input: { fleetId: string }): Promise<number> {
   return fleetRepo.countDrivers(input.fleetId);
 }
+
+export async function updateFleetMembershipRole(input: {
+  membershipId: string;
+  role: 'admin' | 'driver';
+}): Promise<FleetMemberProfile> {
+  return fleetRepo.updateMembershipRole(input);
+}
+
+export async function deactivateFleetMembership(input: {
+  membershipId: string;
+  reason?: string;
+}): Promise<FleetMemberProfile> {
+  return fleetRepo.deactivateMembership(input);
+}
