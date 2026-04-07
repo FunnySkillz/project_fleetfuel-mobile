@@ -2,6 +2,7 @@ export type MembershipRole = 'owner' | 'admin' | 'driver';
 export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
 export type VehicleStatus = 'available' | 'driving' | 'blocked';
 export type AssignmentStatus = 'pending' | 'active' | 'ended' | 'rejected' | 'cancelled';
+export type AssignmentEndReason = 'driver_ended' | 'admin_ended' | 'blocked' | 'system_ended';
 
 export type Fleet = {
   id: string;
@@ -82,11 +83,35 @@ export type VehicleAssignment = {
   requestedByUserId: string | null;
   approvedByUserId: string | null;
   endedByUserId: string | null;
+  rejectedByUserId: string | null;
+  cancelledByUserId: string | null;
   requestedAt: string;
   startedAt: string | null;
   endedAt: string | null;
-  endedReason: string | null;
-  rejectionReason: string | null;
+  rejectedAt: string | null;
+  cancelledAt: string | null;
+  endReason: AssignmentEndReason | null;
+  rejectedReason: string | null;
+  cancelledReason: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type VehicleAssignmentWithContext = VehicleAssignment & {
+  driverProfile: Profile | null;
+  vehicle: Vehicle | null;
+};
+
+export type VehicleWithEffectiveStatus = Vehicle & {
+  effectiveStatus: VehicleStatus;
+  currentAssignment: VehicleAssignmentWithContext | null;
+  pendingRequestCount: number;
+};
+
+export type FleetAssignmentMetrics = {
+  activeDrivers: number;
+  vehiclesInUse: number;
+  availableVehicles: number;
+  blockedVehicles: number;
+  pendingRequests: number;
 };
