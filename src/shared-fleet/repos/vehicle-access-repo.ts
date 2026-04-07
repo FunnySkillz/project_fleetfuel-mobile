@@ -1,148 +1,206 @@
 import { SharedFleetError } from '@/shared-fleet/errors';
 import { getSharedSupabaseClient } from '@/shared-fleet/supabase/client';
-import type { Vehicle, VehicleAssignment } from '@/shared-fleet/types';
+import { invokeSharedFunction } from '@/shared-fleet/supabase/functions';
+import type { FleetAssignmentMetrics, VehicleWithEffectiveStatus } from '@/shared-fleet/types';
 
 import type { VehicleAccessRepo } from './contracts';
+import {
+  calculateFleetAssignmentMetrics,
+  deriveEffectiveVehicleStatus,
+  mapAssignment,
+  mapVehicle,
+  type AssignmentRow,
+  type VehicleRow,
+} from './mappers';
 
-function mapVehicle(row: {
-  id: string;
-  fleet_id: string;
-  name: string;
-  plate: string;
-  status: Vehicle['status'];
-  blocked_until: string | null;
-  blocked_reason: string | null;
-  created_by_user_id: string | null;
-  updated_by_user_id: string | null;
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
-}): Vehicle {
-  return {
-    id: row.id,
-    fleetId: row.fleet_id,
-    name: row.name,
-    plate: row.plate,
-    status: row.status,
-    blockedUntil: row.blocked_until,
-    blockedReason: row.blocked_reason,
-    createdByUserId: row.created_by_user_id,
-    updatedByUserId: row.updated_by_user_id,
-    deletedAt: row.deleted_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+const VEHICLE_COLUMNS = [
+  'id',
+  'fleet_id',
+  'name',
+  'plate',
+  'status',
+  'blocked_until',
+  'blocked_reason',
+  'created_by_user_id',
+  'updated_by_user_id',
+  'deleted_at',
+  'created_at',
+  'updated_at',
+].join(', ');
+
+const ASSIGNMENT_COLUMNS = [
+  'id',
+  'fleet_id',
+  'vehicle_id',
+  'driver_user_id',
+  'driver_membership_id',
+  'status',
+  'requested_by_user_id',
+  'approved_by_user_id',
+  'ended_by_user_id',
+  'rejected_by_user_id',
+  'cancelled_by_user_id',
+  'requested_at',
+  'started_at',
+  'ended_at',
+  'rejected_at',
+  'cancelled_at',
+  'end_reason',
+  'rejected_reason',
+  'cancelled_reason',
+  'created_at',
+  'updated_at',
+].join(', ');
+
+type CreateVehicleResponse = {
+  vehicle: VehicleRow;
+};
+
+function requireId(value: string, fieldName: string) {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new SharedFleetError('shared_validation_error', `${fieldName} is required.`);
+  }
+
+  return normalized;
 }
 
-function mapAssignment(row: {
-  id: string;
-  fleet_id: string;
-  vehicle_id: string;
-  driver_user_id: string;
-  driver_membership_id: string;
-  status: VehicleAssignment['status'];
-  requested_by_user_id: string | null;
-  approved_by_user_id: string | null;
-  ended_by_user_id: string | null;
-  requested_at: string;
-  started_at: string | null;
-  ended_at: string | null;
-  ended_reason: string | null;
-  rejection_reason: string | null;
-  created_at: string;
-  updated_at: string;
-}): VehicleAssignment {
+function asRows<TRow>(data: unknown): TRow[] {
+  return ((data ?? []) as unknown) as TRow[];
+}
+
+async function loadFleetVehicleAssignments(fleetId: string) {
+  const supabase = getSharedSupabaseClient();
+  const [vehiclesResult, activeAssignmentsResult, pendingCountsResult] = await Promise.all([
+    supabase
+      .from('vehicles')
+      .select(VEHICLE_COLUMNS)
+      .eq('fleet_id', fleetId)
+      .is('deleted_at', null)
+      .order('name', { ascending: true }),
+    supabase
+      .from('vehicle_assignments')
+      .select(ASSIGNMENT_COLUMNS)
+      .eq('fleet_id', fleetId)
+      .eq('status', 'active')
+      .is('ended_at', null),
+    supabase
+      .from('vehicle_assignments')
+      .select('vehicle_id')
+      .eq('fleet_id', fleetId)
+      .eq('status', 'pending'),
+  ]);
+
+  if (vehiclesResult.error) {
+    throw new SharedFleetError('shared_unknown_error', vehiclesResult.error.message, {
+      cause: vehiclesResult.error,
+      status: null,
+    });
+  }
+
+  if (activeAssignmentsResult.error) {
+    throw new SharedFleetError('shared_unknown_error', activeAssignmentsResult.error.message, {
+      cause: activeAssignmentsResult.error,
+      status: null,
+    });
+  }
+
+  if (pendingCountsResult.error) {
+    throw new SharedFleetError('shared_unknown_error', pendingCountsResult.error.message, {
+      cause: pendingCountsResult.error,
+      status: null,
+    });
+  }
+
+  const vehicles = asRows<VehicleRow>(vehiclesResult.data).map(mapVehicle);
+  const activeAssignments = asRows<AssignmentRow>(activeAssignmentsResult.data).map(mapAssignment);
+  const pendingCounts = new Map<string, number>();
+
+  for (const row of asRows<{ vehicle_id: string }>(pendingCountsResult.data)) {
+    pendingCounts.set(row.vehicle_id, (pendingCounts.get(row.vehicle_id) ?? 0) + 1);
+  }
+
   return {
-    id: row.id,
-    fleetId: row.fleet_id,
-    vehicleId: row.vehicle_id,
-    driverUserId: row.driver_user_id,
-    driverMembershipId: row.driver_membership_id,
-    status: row.status,
-    requestedByUserId: row.requested_by_user_id,
-    approvedByUserId: row.approved_by_user_id,
-    endedByUserId: row.ended_by_user_id,
-    requestedAt: row.requested_at,
-    startedAt: row.started_at,
-    endedAt: row.ended_at,
-    endedReason: row.ended_reason,
-    rejectionReason: row.rejection_reason,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    vehicles,
+    activeAssignments,
+    pendingCounts,
   };
 }
 
 export const vehicleAccessRepo: VehicleAccessRepo = {
-  async listFleetVehicles(fleetId) {
-    const normalizedFleetId = fleetId.trim();
-    if (!normalizedFleetId) {
-      throw new SharedFleetError('shared_validation_error', 'Fleet id is required.');
+  async createVehicle(input) {
+    const fleetId = requireId(input.fleetId, 'Fleet id');
+    const name = input.name.trim();
+    const plate = input.plate.trim().toUpperCase();
+
+    if (name.length < 2 || name.length > 80) {
+      throw new SharedFleetError('shared_validation_error', 'Vehicle name must be between 2 and 80 characters.');
     }
 
-    const supabase = getSharedSupabaseClient();
-    const { data, error } = await supabase
-      .from('vehicles')
-      .select('id, fleet_id, name, plate, status, blocked_until, blocked_reason, created_by_user_id, updated_by_user_id, deleted_at, created_at, updated_at')
-      .eq('fleet_id', normalizedFleetId)
-      .is('deleted_at', null)
-      .order('name', { ascending: true });
-
-    if (error) {
-      throw new SharedFleetError('shared_unknown_error', error.message, { cause: error, status: null });
+    if (plate.length < 2 || plate.length > 32) {
+      throw new SharedFleetError('shared_validation_error', 'Plate must be between 2 and 32 characters.');
     }
 
-    return ((data ?? []) as {
-      id: string;
-      fleet_id: string;
-      name: string;
-      plate: string;
-      status: Vehicle['status'];
-      blocked_until: string | null;
-      blocked_reason: string | null;
-      created_by_user_id: string | null;
-      updated_by_user_id: string | null;
-      deleted_at: string | null;
-      created_at: string;
-      updated_at: string;
-    }[]).map(mapVehicle);
+    const response = await invokeSharedFunction<CreateVehicleResponse, { fleetId: string; name: string; plate: string }>('create-vehicle', {
+      fleetId,
+      name,
+      plate,
+    });
+
+    return mapVehicle(response.vehicle);
   },
 
-  async listFleetAssignments(fleetId) {
-    const normalizedFleetId = fleetId.trim();
-    if (!normalizedFleetId) {
-      throw new SharedFleetError('shared_validation_error', 'Fleet id is required.');
-    }
+  async listFleetVehicleAccess(fleetId) {
+    const normalizedFleetId = requireId(fleetId, 'Fleet id');
+    const { vehicles, activeAssignments, pendingCounts } = await loadFleetVehicleAssignments(normalizedFleetId);
 
-    const supabase = getSharedSupabaseClient();
-    const { data, error } = await supabase
-      .from('vehicle_assignments')
-      .select(
-        'id, fleet_id, vehicle_id, driver_user_id, driver_membership_id, status, requested_by_user_id, approved_by_user_id, ended_by_user_id, requested_at, started_at, ended_at, ended_reason, rejection_reason, created_at, updated_at',
-      )
-      .eq('fleet_id', normalizedFleetId)
-      .order('requested_at', { ascending: false });
+    const activeAssignmentMap = new Map(activeAssignments.map((assignment) => [assignment.vehicleId, assignment]));
 
-    if (error) {
-      throw new SharedFleetError('shared_unknown_error', error.message, { cause: error, status: null });
-    }
+    return vehicles.map((vehicle): VehicleWithEffectiveStatus => {
+      const activeAssignment = activeAssignmentMap.get(vehicle.id) ?? null;
 
-    return ((data ?? []) as {
-      id: string;
-      fleet_id: string;
-      vehicle_id: string;
-      driver_user_id: string;
-      driver_membership_id: string;
-      status: VehicleAssignment['status'];
-      requested_by_user_id: string | null;
-      approved_by_user_id: string | null;
-      ended_by_user_id: string | null;
-      requested_at: string;
-      started_at: string | null;
-      ended_at: string | null;
-      ended_reason: string | null;
-      rejection_reason: string | null;
-      created_at: string;
-      updated_at: string;
-    }[]).map(mapAssignment);
+      return {
+        ...vehicle,
+        effectiveStatus: deriveEffectiveVehicleStatus({
+          vehicle,
+          currentAssignment: activeAssignment,
+        }),
+        currentAssignment: activeAssignment
+          ? {
+              ...activeAssignment,
+              driverProfile: null,
+              vehicle,
+            }
+          : null,
+        pendingRequestCount: pendingCounts.get(vehicle.id) ?? 0,
+      };
+    });
+  },
+
+  async getFleetAssignmentMetrics(fleetId) {
+    const normalizedFleetId = requireId(fleetId, 'Fleet id');
+    const { vehicles, activeAssignments, pendingCounts } = await loadFleetVehicleAssignments(normalizedFleetId);
+    const activeAssignmentMap = new Map(activeAssignments.map((assignment) => [assignment.vehicleId, assignment]));
+    const vehicleAccessRows = vehicles.map((vehicle): VehicleWithEffectiveStatus => {
+      const activeAssignment = activeAssignmentMap.get(vehicle.id) ?? null;
+      return {
+        ...vehicle,
+        effectiveStatus: deriveEffectiveVehicleStatus({
+          vehicle,
+          currentAssignment: activeAssignment,
+        }),
+        currentAssignment: activeAssignment
+          ? {
+              ...activeAssignment,
+              driverProfile: null,
+              vehicle,
+            }
+          : null,
+        pendingRequestCount: pendingCounts.get(vehicle.id) ?? 0,
+      };
+    });
+
+    const metrics: FleetAssignmentMetrics = calculateFleetAssignmentMetrics(vehicleAccessRows);
+    return metrics;
   },
 };
