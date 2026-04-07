@@ -1,6 +1,11 @@
 # FleetFuel MVP Production Readiness Gate
 
-Last updated: 2026-03-29
+Last updated: 2026-04-07
+
+> Scope note: this checklist is the historical Local MVP release gate.  
+> Shared Fleet production-readiness work is tracked separately in:
+> - `docs/product/shared-fleet-sprint1.md`
+> - `docs/product/shared-fleet-sprint3.md`
 
 ## Purpose
 
