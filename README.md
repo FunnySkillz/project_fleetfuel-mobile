@@ -56,6 +56,8 @@ Supabase edge functions also require standard Supabase runtime env vars when dep
 npm install
 ```
 
+The repo includes `.npmrc` (`legacy-peer-deps=true`) to keep installation stable with the current Expo canary dependency graph.
+
 2. Start app
 
 ```bash
@@ -95,13 +97,21 @@ npx supabase functions serve --env-file supabase/.env.local
 ## Validation commands
 
 ```bash
+npx expo-doctor
 npm run lint
 npx tsc --noEmit
 npm test
+npx expo export --platform web --clear
 npx supabase db test
 ```
 
 Note: `npx supabase db test` needs a running local Supabase stack (`supabase start`).
+
+## iOS notes
+
+- App scheme for deep links/auth callbacks: `fleetfuel://`
+- Shared auth callbacks are handled in the Shared Fleet provider layer.
+- Shared screens use safe-area wrappers and tap-safe keyboard behavior for form-heavy flows.
 
 ## Project structure
 
@@ -124,3 +134,4 @@ Note: `npx supabase db test` needs a running local Supabase stack (`supabase sta
 - Rich export formats for reporting
 - Offline-aware shared sync
 - Enterprise-grade fleet controls (advanced policy/admin tooling)
+- Dependency cleanup from Expo canary stream once stable SDK releases are adopted
