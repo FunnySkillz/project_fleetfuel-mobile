@@ -2,7 +2,34 @@ export type MembershipRole = 'owner' | 'admin' | 'driver';
 export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
 export type VehicleStatus = 'available' | 'driving' | 'blocked';
 export type AssignmentStatus = 'pending' | 'active' | 'ended' | 'rejected' | 'cancelled';
-export type AssignmentEndReason = 'driver_ended' | 'admin_ended' | 'blocked' | 'system_ended';
+export type AssignmentEndReason = 'driver_ended' | 'admin_ended' | 'blocked' | 'system_ended' | 'archived';
+export type NotificationEventType =
+  | 'fleet_created'
+  | 'invitation_sent'
+  | 'invitation_accepted'
+  | 'invitation_revoked'
+  | 'vehicle_created'
+  | 'vehicle_updated'
+  | 'vehicle_request_submitted'
+  | 'assignment_approved'
+  | 'assignment_rejected'
+  | 'assignment_cancelled'
+  | 'direct_assignment_created'
+  | 'assignment_ended'
+  | 'vehicle_blocked'
+  | 'vehicle_unblocked'
+  | 'vehicle_archived'
+  | 'vehicle_unarchived'
+  | 'membership_role_changed'
+  | 'membership_deactivated';
+
+export type SharedJson =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: SharedJson | undefined }
+  | SharedJson[];
 
 export type Fleet = {
   id: string;
@@ -30,6 +57,9 @@ export type FleetMembership = {
   joinedAt: string;
   endedAt: string | null;
   endedByUserId: string | null;
+  deactivatedReason: string | null;
+  roleUpdatedAt: string | null;
+  roleUpdatedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -66,6 +96,9 @@ export type Vehicle = {
   status: VehicleStatus;
   blockedUntil: string | null;
   blockedReason: string | null;
+  archivedAt: string | null;
+  archivedByUserId: string | null;
+  archiveReason: string | null;
   createdByUserId: string | null;
   updatedByUserId: string | null;
   deletedAt: string | null;
@@ -114,4 +147,43 @@ export type FleetAssignmentMetrics = {
   availableVehicles: number;
   blockedVehicles: number;
   pendingRequests: number;
+};
+
+export type FleetNotification = {
+  id: string;
+  fleetId: string;
+  recipientUserId: string;
+  eventType: NotificationEventType;
+  entityType: string;
+  entityId: string | null;
+  payload: SharedJson;
+  isRead: boolean;
+  readAt: string | null;
+  dedupeKey: string | null;
+  createdByUserId: string | null;
+  createdAt: string;
+};
+
+export type FleetAuditLog = {
+  id: string;
+  fleetId: string;
+  actorUserId: string | null;
+  actorMembershipId: string | null;
+  eventType: string;
+  entityType: string;
+  entityId: string | null;
+  payload: SharedJson;
+  idempotencyKey: string | null;
+  createdAt: string;
+};
+
+export type FleetOperationalReport = {
+  activeDrivers: number;
+  vehiclesInUse: number;
+  availableVehicles: number;
+  blockedVehicles: number;
+  pendingRequests: number;
+  archivedVehicles: number;
+  membershipCountsByRole: Record<string, number>;
+  recentAuditActivity: FleetAuditLog[];
 };
