@@ -21,6 +21,20 @@ function mapCodeToError(code: string | undefined, status: number, message: strin
       return new SharedFleetError('shared_already_member', message, { status });
     case 'forbidden':
       return new SharedFleetError('shared_forbidden', message, { status });
+    case 'not_authorized':
+      return new SharedFleetError('shared_not_authorized', message, { status });
+    case 'vehicle_blocked':
+      return new SharedFleetError('shared_vehicle_blocked', message, { status });
+    case 'assignment_conflict':
+      return new SharedFleetError('shared_assignment_conflict', message, { status });
+    case 'assignment_not_found':
+      return new SharedFleetError('shared_assignment_not_found', message, { status });
+    case 'already_ended':
+      return new SharedFleetError('shared_already_ended', message, { status });
+    case 'invalid_transition':
+      return new SharedFleetError('shared_invalid_transition', message, { status });
+    case 'duplicate_request':
+      return new SharedFleetError('shared_duplicate_request', message, { status });
     case 'not_found':
       return new SharedFleetError('shared_not_found', message, { status });
     default:
