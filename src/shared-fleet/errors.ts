@@ -10,6 +10,7 @@ export type SharedFleetErrorCode =
   | 'shared_forbidden'
   | 'shared_not_authorized'
   | 'shared_vehicle_blocked'
+  | 'shared_vehicle_archived'
   | 'shared_assignment_conflict'
   | 'shared_assignment_not_found'
   | 'shared_already_ended'
