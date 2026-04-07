@@ -5,6 +5,7 @@ import type {
   Fleet,
   FleetMembership,
   FleetMembershipWithFleet,
+  FleetMemberProfile,
   Profile,
 } from '@/shared-fleet/types';
 
@@ -46,6 +47,9 @@ function mapMembership(row: {
   joined_at: string;
   ended_at: string | null;
   ended_by_user_id: string | null;
+  deactivated_reason: string | null;
+  role_updated_at: string | null;
+  role_updated_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 }): FleetMembership {
@@ -59,6 +63,9 @@ function mapMembership(row: {
     joinedAt: row.joined_at,
     endedAt: row.ended_at,
     endedByUserId: row.ended_by_user_id,
+    deactivatedReason: row.deactivated_reason,
+    roleUpdatedAt: row.role_updated_at,
+    roleUpdatedByUserId: row.role_updated_by_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -117,7 +124,7 @@ export const fleetRepo: FleetRepo = {
     const { data: memberships, error: membershipsError } = await supabase
       .from('fleet_memberships')
       .select(
-        'id, fleet_id, user_id, role, invited_by_user_id, invitation_id, joined_at, ended_at, ended_by_user_id, created_at, updated_at',
+        'id, fleet_id, user_id, role, invited_by_user_id, invitation_id, joined_at, ended_at, ended_by_user_id, deactivated_reason, role_updated_at, role_updated_by_user_id, created_at, updated_at',
       )
       .eq('user_id', userId)
       .is('ended_at', null)
@@ -140,6 +147,9 @@ export const fleetRepo: FleetRepo = {
       joined_at: string;
       ended_at: string | null;
       ended_by_user_id: string | null;
+      deactivated_reason: string | null;
+      role_updated_at: string | null;
+      role_updated_by_user_id: string | null;
       created_at: string;
       updated_at: string;
     }[];
@@ -194,7 +204,9 @@ export const fleetRepo: FleetRepo = {
 
     const { data: memberships, error: membershipsError } = await supabase
       .from('fleet_memberships')
-      .select('id, fleet_id, user_id, role, invited_by_user_id, invitation_id, joined_at, ended_at, ended_by_user_id, created_at, updated_at')
+      .select(
+        'id, fleet_id, user_id, role, invited_by_user_id, invitation_id, joined_at, ended_at, ended_by_user_id, deactivated_reason, role_updated_at, role_updated_by_user_id, created_at, updated_at',
+      )
       .eq('fleet_id', normalizedFleetId)
       .is('ended_at', null)
       .order('joined_at', { ascending: true });
@@ -216,6 +228,9 @@ export const fleetRepo: FleetRepo = {
       joined_at: string;
       ended_at: string | null;
       ended_by_user_id: string | null;
+      deactivated_reason: string | null;
+      role_updated_at: string | null;
+      role_updated_by_user_id: string | null;
       created_at: string;
       updated_at: string;
     }[];
@@ -274,5 +289,118 @@ export const fleetRepo: FleetRepo = {
     }
 
     return count ?? 0;
+  },
+
+  async updateMembershipRole(input) {
+    const membershipId = input.membershipId.trim();
+    if (!membershipId) {
+      throw new SharedFleetError('shared_validation_error', 'Membership id is required.');
+    }
+
+    const response = await invokeSharedFunction<
+      {
+        membership: {
+          id: string;
+          fleet_id: string;
+          user_id: string;
+          role: FleetMembership['role'];
+          invited_by_user_id: string | null;
+          invitation_id: string | null;
+          joined_at: string;
+          ended_at: string | null;
+          ended_by_user_id: string | null;
+          deactivated_reason: string | null;
+          role_updated_at: string | null;
+          role_updated_by_user_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+      },
+      { membershipId: string; role: 'admin' | 'driver' }
+    >('update-membership-role', {
+      membershipId,
+      role: input.role,
+    });
+
+    const membership = mapMembership(response.membership);
+    const supabase = getSharedSupabaseClient();
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, email, display_name, created_at, updated_at')
+      .eq('id', membership.userId)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new SharedFleetError('shared_unknown_error', profileError.message, { cause: profileError, status: null });
+    }
+
+    return {
+      ...membership,
+      profile: profileData
+        ? mapProfile(profileData as {
+            id: string;
+            email: string;
+            display_name: string | null;
+            created_at: string;
+            updated_at: string;
+          })
+        : null,
+    } satisfies FleetMemberProfile;
+  },
+
+  async deactivateMembership(input) {
+    const membershipId = input.membershipId.trim();
+    const reason = input.reason?.trim() ?? '';
+
+    if (!membershipId) {
+      throw new SharedFleetError('shared_validation_error', 'Membership id is required.');
+    }
+
+    const response = await invokeSharedFunction<
+      {
+        membership: {
+          id: string;
+          fleet_id: string;
+          user_id: string;
+          role: FleetMembership['role'];
+          invited_by_user_id: string | null;
+          invitation_id: string | null;
+          joined_at: string;
+          ended_at: string | null;
+          ended_by_user_id: string | null;
+          deactivated_reason: string | null;
+          role_updated_at: string | null;
+          role_updated_by_user_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+      },
+      { membershipId: string; reason?: string }
+    >('deactivate-membership', reason ? { membershipId, reason } : { membershipId });
+
+    const membership = mapMembership(response.membership);
+    const supabase = getSharedSupabaseClient();
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, email, display_name, created_at, updated_at')
+      .eq('id', membership.userId)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new SharedFleetError('shared_unknown_error', profileError.message, { cause: profileError, status: null });
+    }
+
+    return {
+      ...membership,
+      profile: profileData
+        ? mapProfile(profileData as {
+            id: string;
+            email: string;
+            display_name: string | null;
+            created_at: string;
+            updated_at: string;
+          })
+        : null,
+    } satisfies FleetMemberProfile;
   },
 };
